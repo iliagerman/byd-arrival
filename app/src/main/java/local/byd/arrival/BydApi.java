@@ -9,15 +9,15 @@ import java.util.*;
 
 /** Direct EU API. No request/response logging and never retries a mutation. */
 public final class BydApi {
-    private static final String HOST = "https://dilinkappoversea-eu.byd.auto";
     private final Bangcle codec;
-    private final String username, password, pin, device;
+    private final String username, password, pin, device, host, country, timeZone;
     private final Map<String,String> cookies = new HashMap<>();
     private JSONObject token;
     private long authenticatedAt;
-    public BydApi(byte[] tables, String username, String password, String pin) throws Exception {
+    public BydApi(byte[] tables, String username, String password, String pin, String host, String country, String timeZone) throws Exception {
         this.codec = new Bangcle(tables);
         this.username = username; this.password = password; this.pin = pin;
+        this.host = host; this.country = country; this.timeZone = timeZone;
         device = Crypto.md5(username);
     }
     static LinkedHashMap<String,String> fields(String... pairs) {
@@ -51,11 +51,11 @@ public final class BydApi {
         Map<String,String> inner=fields("agreeStatus","0","agreementType","[1,2]","appInnerVersion","351",
             "appVersion","3.5.1","deviceName","XIAOMIPOCO F1","deviceType","0","imeiMD5",device,
             "isAuto","1","mobileBrand","XIAOMI","mobileModel","POCO F1","networkType","wifi",
-            "osType","15","osVersion","35","random",random(),"softType","0","timeStamp",now,"timeZone","Asia/Jerusalem");
+            "osType","15","osVersion","35","random",random(),"softType","0","timeStamp",now,"timeZone",timeZone);
         Map<String,String> signed=new LinkedHashMap<>(inner);
-        signed.putAll(fields("appName","pyBYD+0.1","countryCode","IL","functionType","pwdLogin",
+        signed.putAll(fields("appName","pyBYD+0.1","countryCode",country,"functionType","pwdLogin",
             "identifier",username,"identifierType","0","language","en","reqTimestamp",now));
-        Map<String,String> outer=fields("appName","pyBYD+0.1","countryCode","IL",
+        Map<String,String> outer=fields("appName","pyBYD+0.1","countryCode",country,
             "encryData",Crypto.encrypt(json(inner),Crypto.md5(Crypto.md5(password))),"functionType","pwdLogin",
             "identifier",username,"identifierType","0","imeiMD5",device,"isAuto","1","language","en",
             "reqTimestamp",now,"sign",Crypto.sign(signed,Crypto.md5(password)),"signKey",password);
@@ -71,9 +71,9 @@ public final class BydApi {
         String now=Long.toString(System.currentTimeMillis());
         String contentKey=Crypto.md5(token.getString("encryToken"));
         Map<String,String> signed=new LinkedHashMap<>(inner);
-        signed.putAll(fields("countryCode","IL","identifier",token.getString("userId"),"imeiMD5",device,
+        signed.putAll(fields("countryCode",country,"identifier",token.getString("userId"),"imeiMD5",device,
             "language","en","reqTimestamp",now));
-        Map<String,String> outer=fields("countryCode","IL","encryData",Crypto.encrypt(json(inner),contentKey),
+        Map<String,String> outer=fields("countryCode",country,"encryData",Crypto.encrypt(json(inner),contentKey),
             "identifier",token.getString("userId"),"imeiMD5",device,"language","en","reqTimestamp",now,
             "sign",Crypto.sign(signed,Crypto.md5(token.getString("signToken"))));
         deviceFields(outer);
@@ -203,7 +203,7 @@ public final class BydApi {
         String digest=Crypto.md5(json(fields)).toLowerCase(Locale.ROOT);
         fields.put("checkcode",digest.substring(24)+digest.substring(8,16)+digest.substring(16,24)+digest.substring(0,8));
         byte[] body=("{\"request\":"+JSONObject.quote(codec.encode(json(fields)))+"}").getBytes(StandardCharsets.UTF_8);
-        HttpURLConnection connection=(HttpURLConnection)new URL(HOST+endpoint).openConnection();
+        HttpURLConnection connection=(HttpURLConnection)new URL(host+endpoint).openConnection();
         connection.setConnectTimeout(15000); connection.setReadTimeout(20000);
         connection.setInstanceFollowRedirects(false); connection.setRequestMethod("POST"); connection.setDoOutput(true);
         connection.setRequestProperty("Content-Type","application/json; charset=UTF-8");

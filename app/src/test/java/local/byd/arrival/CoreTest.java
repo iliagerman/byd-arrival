@@ -103,6 +103,19 @@ public class CoreTest {
         check(!byWifi.observe(20, 5, true) && byWifi.armed(), "trusted Wi-Fi arms before the start distance");
         check(byWifi.observe(10, 5, true), "armed by Wi-Fi, the trigger fires when the phone gets close");
         check(Math.abs(ProximityGate.metres(32.0, 34.0, 32.0001, 34.0) - 11.12) < 0.05, "0.0001 degrees latitude is about 11 m");
+        check(Regions.COUNTRIES.size() == 101 && Regions.SERVERS.size() == 16, "all countries and servers are listed");
+        check(Regions.country("IL").server.equals("eu") && Regions.host("eu").equals("https://dilinkappoversea-eu.byd.auto"), "Israel stays on the Europe server");
+        check(Regions.country("AU").server.equals("au") && Regions.country("AE").server.equals("no") && Regions.country("TH").server.equals("sg"), "countries map to their region's server");
+        Set<String> codes = new HashSet<>();
+        for (Regions.Country country : Regions.COUNTRIES) {
+            check(codes.add(country.code), "country code is unique: " + country.code);
+            check(Regions.SERVERS.containsKey(country.server), "country uses a known server: " + country.code);
+        }
+        check(Regions.preferredCountry("il", "US").equals("IL"), "SIM country is preferred");
+        check(Regions.preferredCountry("", "de").equals("DE"), "language setting is the next choice");
+        check(Regions.preferredCountry("", "").equals("GB"), "unknown phone country falls back to a listed one");
+        try { Regions.host("evil.example.com/"); throw new AssertionError("must reject unknown server"); }
+        catch (IllegalArgumentException expected) { check(true, "only listed servers are accepted"); }
         check(UpdateCheck.buildOf("v42") == 42, "release tag holds the build number");
         check(UpdateCheck.newerBuild("v42", 41) == 42, "a higher build on GitHub is an update");
         check(UpdateCheck.newerBuild("v42", 42) == 0, "the same build is not an update");

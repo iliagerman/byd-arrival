@@ -19,7 +19,7 @@ public final class ApiTest {
         URL.setURLStreamHandlerFactory(protocol->protocol.equals("https")?new URLStreamHandler() {
             protected URLConnection openConnection(URL url) { return new Fixture(url); }
         }:null);
-        BydApi api=new BydApi(tables,USER,PASS,PIN);
+        BydApi api=new BydApi(tables,USER,PASS,PIN,Regions.host("au"),"AU","Australia/Sydney");
         JSONArray cars=api.vehicles();check(cars.length()==1,"vehicle discovery");
         api.verifyPin("SYNTHETICVIN");
         api.command("SYNTHETICVIN","OPENAIR",BydApi.climateParams(21,17,5,30));
@@ -47,10 +47,13 @@ public final class ApiTest {
                 JSONObject outer=new JSONObject(cipher.decode(new JSONObject(request.toString(StandardCharsets.UTF_8)).getString("request")));
                 String key=Crypto.md5("test-encryption-token");
                 String endpoint=url.getPath();
+                check(url.getHost().equals("dilinkappoversea-au.byd.auto"),"requests go to the chosen server");
+                check(outer.getString("countryCode").equals("AU"),"requests carry the chosen country");
                 Object payload;
                 if(endpoint.endsWith("/login")) {
                     check(outer.getString("signKey").equals(PASS),"password in encrypted envelope only");
                     key=Crypto.md5(Crypto.md5(PASS));
+                    check(new JSONObject(Crypto.decrypt(outer.getString("encryData"),key)).getString("timeZone").equals("Australia/Sydney"),"login carries the phone's time zone");
                     payload=new JSONObject().put("token",new JSONObject().put("userId","fixture-user").put("encryToken","test-encryption-token").put("signToken","test-sign-token"));
                 } else {
                     JSONObject inner=new JSONObject(Crypto.decrypt(outer.getString("encryData"),key));

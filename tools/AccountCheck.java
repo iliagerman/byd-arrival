@@ -6,7 +6,8 @@ import java.nio.file.*;
 public final class AccountCheck {
     public static void main(String[] args) throws Exception {
         try {
-            BydApi api=new BydApi(Files.readAllBytes(Path.of(args[0])),System.getenv("USERNAME"),System.getenv("PASSWORD"),System.getenv("PIN"));
+            BydApi api=new BydApi(Files.readAllBytes(Path.of(args[0])),System.getenv("USERNAME"),System.getenv("PASSWORD"),System.getenv("PIN"),
+            Regions.host(Regions.country(System.getenv("COUNTRY")).server),System.getenv("COUNTRY"),java.util.TimeZone.getDefault().getID());
             int count=api.vehicles().length();
             System.out.println("Native Android client authenticated; vehicle count: "+count+". No car commands sent.");
         } catch(Exception error) {

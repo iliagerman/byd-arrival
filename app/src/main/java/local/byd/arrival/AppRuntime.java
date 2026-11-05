@@ -52,11 +52,15 @@ final class AppRuntime {
     }
     static SharedPreferences prefs(Context c) { return c.getSharedPreferences("settings",0); }
     static void clearSession() { api=null; }
+    /** Sign-in saves both. Installs signed in before regions existed can only be Israel on the Europe server. */
+    static String country(Context c) { return prefs(c).getString("country","IL"); }
+    static String server(Context c) { return prefs(c).getString("server","eu"); }
     static BydApi api(Context c) throws Exception {
         if(api==null) {
             JSONObject credentials=new Vault(c).load();
             try(InputStream stream=c.getAssets().open("bangcle_tables.bin")) {
-                api=new BydApi(stream.readAllBytes(),credentials.getString("username"),credentials.getString("password"),credentials.getString("pin"));
+                api=new BydApi(stream.readAllBytes(),credentials.getString("username"),credentials.getString("password"),credentials.getString("pin"),
+                    Regions.host(server(c)),country(c),TimeZone.getDefault().getID());
             }
         }
         return api;

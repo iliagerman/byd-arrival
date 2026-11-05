@@ -8,7 +8,7 @@ logging.disable(logging.CRITICAL)
 
 async def main():
     config = BydConfig(username=os.environ['USERNAME'], password=os.environ['PASSWORD'],
-                       country_code='IL', time_zone='Asia/Jerusalem', mqtt_enabled=False)
+                       country_code=os.environ['COUNTRY'], time_zone=os.environ['TIME_ZONE'], mqtt_enabled=False)
     try:
         async with BydClient(config) as client:
             vehicles = await client.get_vehicles()

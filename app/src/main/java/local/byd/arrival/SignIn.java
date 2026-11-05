@@ -2,9 +2,11 @@ package local.byd.arrival;
 
 import android.app.*;
 import android.content.Intent;
+import android.telephony.TelephonyManager;
 import android.view.*;
 import android.widget.*;
 import org.json.*;
+import java.util.*;
 
 /**
  * Sign-in popup and car picker, used on first launch and from Settings. The popup window is secure (no screenshots)
@@ -17,26 +19,54 @@ final class SignIn {
         View view=activity.getLayoutInflater().inflate(R.layout.sign_in,null);
         EditText email=view.findViewById(R.id.email), password=view.findViewById(R.id.password), pin=view.findViewById(R.id.pin);
         email.setText(AppRuntime.prefs(activity).getString("account",""));
+        Spinner country=view.findViewById(R.id.country), server=view.findViewById(R.id.server);
+        bindRegion(activity,country,server);
         AlertDialog dialog=new AlertDialog.Builder(activity).setTitle("Sign in to BYD").setView(view)
             .setPositiveButton("Sign in",null).setNegativeButton("Not now",null).create();
         dialog.getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
         dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v-> {
             v.setEnabled(false);
-            signIn(activity,dialog,v,email.getText().toString().trim(),password.getText().toString(),pin.getText().toString(),done);
+            String code=Regions.COUNTRIES.get(country.getSelectedItemPosition()).code;
+            String serverId=new ArrayList<>(Regions.SERVERS.keySet()).get(server.getSelectedItemPosition());
+            signIn(activity,dialog,v,email.getText().toString().trim(),password.getText().toString(),pin.getText().toString(),code,serverId,done);
         }));
         dialog.show();
     }
-    private static void signIn(Activity activity,AlertDialog dialog,View button,String user,String pass,String code,Runnable done) {
+    /** Preselects the saved region, or the phone's country for a new user. Choosing a country selects its server. */
+    private static void bindRegion(Activity activity,Spinner country,Spinner server) {
+        List<String> names=new ArrayList<>(), servers=new ArrayList<>(Regions.SERVERS.keySet());
+        List<String> codes=new ArrayList<>();
+        for(Regions.Country item:Regions.COUNTRIES) { names.add(item.name); codes.add(item.code); }
+        country.setAdapter(new ArrayAdapter<>(activity,android.R.layout.simple_spinner_dropdown_item,names));
+        server.setAdapter(new ArrayAdapter<>(activity,android.R.layout.simple_spinner_dropdown_item,new ArrayList<>(Regions.SERVERS.values())));
+        boolean known=signedIn(activity) || AppRuntime.prefs(activity).contains("country");
+        String code=known?AppRuntime.country(activity):Regions.preferredCountry(
+            activity.getSystemService(TelephonyManager.class).getSimCountryIso(),Locale.getDefault().getCountry());
+        int selected=codes.indexOf(code);
+        country.setSelection(selected,false);
+        server.setSelection(servers.indexOf(known?AppRuntime.server(activity):Regions.country(code).server),false);
+        int[] last={selected};
+        country.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> parent,View view,int position,long id) {
+                if(position==last[0]) return; // Android also calls this once at setup, which must keep a saved server
+                last[0]=position;
+                server.setSelection(servers.indexOf(Regions.COUNTRIES.get(position).server));
+            }
+            @Override public void onNothingSelected(AdapterView<?> parent) {}
+        });
+    }
+    private static void signIn(Activity activity,AlertDialog dialog,View button,String user,String pass,String code,String country,String server,Runnable done) {
         activity.stopService(new Intent(activity,MonitorService.class));
         AppRuntime.IO.execute(()-> {
             try {
                 new Vault(activity).save(user,pass,code); AppRuntime.clearSession();
-                AppRuntime.prefs(activity).edit().putString("account",user).remove("vin").remove("vehicleName").apply();
+                AppRuntime.prefs(activity).edit().putString("account",user).putString("country",country).putString("server",server)
+                    .remove("vin").remove("vehicleName").apply();
                 JSONArray cars=AppRuntime.api(activity).vehicles();
                 activity.runOnUiThread(()-> { dialog.dismiss(); pickCar(activity,cars,done); });
             } catch(Exception error) {
                 AppRuntime.clearSession();
-                activity.runOnUiThread(()-> { button.setEnabled(true); toast(activity,AppRuntime.safeError(error)); });
+                activity.runOnUiThread(()-> { button.setEnabled(true); toast(activity,AppRuntime.safeError(error)+" Check your details, country and server."); });
             }
         });
     }

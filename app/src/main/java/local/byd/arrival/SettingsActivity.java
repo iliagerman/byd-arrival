@@ -77,6 +77,8 @@ public final class SettingsActivity extends Activity {
         if(!getSharedPreferences("vault",0).contains("ciphertext")) accountState.setText("Not signed in.");
         else if(!AppRuntime.ready(this)) accountState.setText(who+". Choose your car.");
         else accountState.setText(who+" · "+prefs.getString("vehicleName","car selected"));
+        if(getSharedPreferences("vault",0).contains("ciphertext"))
+            accountState.append("\n"+Regions.country(AppRuntime.country(this)).name+" · "+Regions.SERVERS.get(AppRuntime.server(this))+" server");
         android.text.SpannableStringBuilder state=new android.text.SpannableStringBuilder();
         mark(state,has(Manifest.permission.ACCESS_FINE_LOCATION),"Location");
         mark(state,has(Manifest.permission.ACCESS_BACKGROUND_LOCATION),"Location: allow all the time");

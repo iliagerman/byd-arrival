@@ -6,7 +6,8 @@ import java.nio.file.*;
 /** Read-only: prints the car's capability list (functionNo, code, name). No PIN check, no car commands. */
 public final class ConfigDump {
     public static void main(String[] args) throws Exception {
-        BydApi api=new BydApi(Files.readAllBytes(Path.of(args[0])),System.getenv("USERNAME"),System.getenv("PASSWORD"),System.getenv("PIN"));
+        BydApi api=new BydApi(Files.readAllBytes(Path.of(args[0])),System.getenv("USERNAME"),System.getenv("PASSWORD"),System.getenv("PIN"),
+            Regions.host(Regions.country(System.getenv("COUNTRY")).server),System.getenv("COUNTRY"),java.util.TimeZone.getDefault().getID());
         JSONArray cars=api.vehicles();
         System.out.println("Vehicle fields: "+cars.getJSONObject(0).keySet());
         String vin=cars.getJSONObject(0).getString("vin");

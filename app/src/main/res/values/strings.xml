@@ -11,10 +11,12 @@
     <string name="setup_button">Set up</string>
     <string name="account_title">BYD account</string>
     <string name="sign_in_body">Your password and PIN stay encrypted on this phone and are only sent to BYD.</string>
+    <string name="country">Country</string>
+    <string name="server">BYD server (set automatically from the country)</string>
     <string name="email">Email</string>
     <string name="password">Password</string>
     <string name="pin">Six-digit control PIN</string>
-    <string name="save_account">Sign in</string>
+    <string name="save_account">Sign in or change region</string>
     <string name="change_car">Change car</string>
     <string name="temperature">A/C on button temperature (°C)</string>
     <string name="arrival_title">Auto-start near the car</string>
