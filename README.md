@@ -2,7 +2,7 @@
 
 An unofficial Android app that controls a BYD car from your phone. It offers a home-screen widget with one-tap buttons, a climate start that adapts to the temperature, custom button combinations, and an optional auto-start when you walk up to the car.
 
-**[Download the latest APK](https://github.com/iliagerman/byd-arrival/releases/latest/download/byd-arrival.apk)**
+**[Download the latest APK](https://github.com/iliagerman/byd-arrival/releases/latest/download/byd-arrival.apk)** · **Source code:** https://github.com/iliagerman/byd-arrival
 
 > **Unofficial software, use at your own risk.** This project isn't affiliated with or endorsed by BYD. It talks to BYD's private cloud API, which can change or stop working at any time. It sends real commands to a real car, including unlocking the doors, sometimes automatically and without asking for a PIN. Read [Security and privacy](#security-and-privacy) before you turn those features on.
 
@@ -13,7 +13,7 @@ You need:
 - An Android phone running Android 13 or newer.
 - A BYD car already linked to a BYD account in the official app, with a remote-control PIN set.
 
-**Current limit:** the app has only been used with one Atto 3 in Israel. It sends the country code `IL` and time zone `Asia/Jerusalem` at login and uses BYD's overseas EU server. These values are built in, so accounts from other regions may not be able to sign in.
+**Regions:** you choose your country at sign-in, from 101 countries, and the app selects the matching BYD server, one of 16. Only one Atto 3 in Israel has actually used the app. The other servers respond, but signing in on them hasn't been tried. Other BYD models may also support fewer commands.
 
 ## What it can do
 
@@ -54,9 +54,10 @@ To check a download, compare it with the SHA-256 in that [release's notes](https
 
 ## First launch
 
-1. **Sign in.** Enter your BYD email, password and six-digit control PIN. The popup stays open until BYD accepts the login.
+1. **Sign in.** Choose your country, then enter your BYD email, password and six-digit control PIN. The country selects the server for you; change the server only if sign-in fails. The popup stays open until BYD accepts the login.
 2. **Pick your car.** If the account has only one car, it's selected for you.
-3. **Grant permissions.** The app asks for each in turn:
+3. **Set up auto-start.** A short walkthrough explains auto-start, lets you set its distances, and offers a first try in test mode. You can skip it and reopen it later with Settings → **Walk me through setup**.
+4. **Grant permissions.** The app asks for each in turn:
 
 | Permission | Why |
 |---|---|
@@ -103,20 +104,27 @@ Settings → **Custom actions** → **New custom action**. Give it a name and ti
 
 ### Auto-start near the car
 
-This runs an action when your phone comes close to the parked car. It's off until you start it. Set it up under Settings → **AUTOMATION**:
+This runs an action when your phone comes close to the parked car. It's off until you start it. The walkthrough after your first login covers the setup, or you can do it yourself under Settings → **AUTOMATION**:
 
 1. Choose what **Auto-start runs** (default: Start car).
 2. Set the distances and timing:
    - **Start the car when within:** default 15 m.
-   - **Re-arm after getting further than:** default 30 m.
+   - **Re-arm after getting further than:** default 20 m.
    - **Minimum minutes between automatic starts:** default 5.
 3. Leave **Test mode** on at first. It sends a notification instead of controlling the car.
 4. Tap **Start monitoring**. The app reads the car's position, then follows your phone's location.
 5. Walk away and come back to see how it behaves, then turn Test mode off and start monitoring again.
 
+You can't save values that don't work together, because the app adjusts them for you and shows the result:
+
+- The start distance stays between 3 and 495 m.
+- The re-arm distance stays at least 5 m beyond the start distance, up to 500 m.
+- The minimum time stays between 1 and 60 minutes.
+- A blank field uses its default.
+
 How it behaves:
 
-- **It fires once per arrival.** After firing, it waits until you've clearly left. The whole accuracy margin of a reading must be past the re-arm distance, so 45 m ±25 m doesn't count when the re-arm distance is 30 m.
+- **It fires once per arrival.** After firing, it waits until you've clearly left. The whole accuracy margin of a reading must be past the re-arm distance, so 30 m ±15 m doesn't count when the re-arm distance is 20 m.
 - **It must see you leave first.** It starts disarmed, so turning it on beside the car does nothing.
 - **Inaccurate readings can't fire it.** Readings less accurate than the re-arm distance are ignored.
 - **A failed command stops monitoring,** with a message explaining why.
@@ -154,13 +162,13 @@ Tapping either one downloads the APK in your browser. Open the file to install i
 - **Your credentials stay on the phone, encrypted.** The email, password and PIN are encrypted with a key held in Android Keystore, and are excluded from Android backups.
 - **They can be used while the phone is locked.** Auto-start needs this. It also means anyone who can reach your widget can control your car without entering a PIN. Keep a screen lock on your phone.
 - **Auto-start can act without you.** Anyone carrying your unlocked or locked phone near the car can trigger it, and the action you chose may unlock the doors. GPS and Bluetooth signals can be spoofed.
-- **The network traffic is limited.** The app connects only to BYD's server and to GitHub (for the version check and downloads). There are no analytics or ads, and your location is only used on the phone to work out the distance.
+- **The network traffic is limited.** The app connects only to BYD's server for your region and to GitHub (for the version check and downloads). There are no analytics or ads, and your location is only used on the phone to work out the distance.
 - **To erase your data,** use Settings → **Forget credentials**, or uninstall the app.
 
 ## Troubleshooting
 
 - **"App not installed" when updating:** an older test build was signed with a different key. Uninstall it and install again. You'll need to sign in again.
-- **Sign-in fails:** see [the region limit](#will-it-work-with-my-car), and check that your account works in the official app.
+- **Sign-in fails:** check that your account works in the official app, then check the country and server in the sign-in popup. If your country's server is rejected, try the server for a neighbouring region. To change region later, use Settings → **Sign in or change region**.
 - **The distance never changes or the time stops advancing:** location updates aren't arriving. Check that location is on and set to "Allow all the time", and that the battery setting is unrestricted.
 - **Auto-start didn't fire:** look at the event line on the home screen, such as `Armed by GPS: 41 m ±8 m` or `Triggered at 12 m`. Also check whether you're still on a trusted Wi-Fi, and whether the minimum time has passed.
 
@@ -169,12 +177,24 @@ Tapping either one downloads the APK in your browser. Open the file to install i
 Written in plain Java with no third-party runtime libraries. You need JDK 17 and the Android SDK (API 34).
 
 ```sh
+git clone https://github.com/iliagerman/byd-arrival.git
+cd byd-arrival
 tools/test-core.sh            # JVM tests, no Android SDK needed
 ./gradlew assembleDebug       # debug APK in app/build/outputs/apk/debug/
 ./gradlew lintDebug
 ```
 
-The `tools/` folder holds read-only account checks that use your BYD login from environment variables and send no car commands.
+If you already have a copy of this folder without its `.git` directory, connect it to the repository without touching your files:
+
+```sh
+git init -b main
+git remote add origin https://github.com/iliagerman/byd-arrival.git
+git fetch origin
+git reset origin/main
+git branch --set-upstream-to=origin/main main
+```
+
+The `tools/` folder holds read-only account checks that send no car commands. They read `USERNAME`, `PASSWORD`, `PIN` and `COUNTRY` from environment variables.
 
 ### Release pipeline
 
@@ -191,6 +211,14 @@ Android only installs an update signed with the same key, so losing the key mean
 
 **If you fork this project:** create your own keystore and secrets, replace `SIGNING_CERT_SHA256` in the workflow, and change `REPO` in `Updates.java`.
 
+## License
+
+[MIT](LICENSE). You can use, copy, change, sell and redistribute this project however you like. The only condition is keeping the copyright and license notice. It comes with no warranty.
+
 ## Credits
 
-The BYD API details and the Bangcle codec tables come from [pyBYD](https://github.com/jkaberg/pyBYD) by Joel Kåberg, under the MIT license (see [`THIRD_PARTY_LICENSE.txt`](THIRD_PARTY_LICENSE.txt)). [ioBroker.byd](https://github.com/TA2k/ioBroker.byd) was a second reference for the command names.
+- [pyBYD](https://github.com/jkaberg/pyBYD) by Joel Kåberg: the BYD API details and the Bangcle codec tables.
+- [hass-byd-vehicle](https://github.com/jkaberg/hass-byd-vehicle): the regional servers and the country-to-server table.
+- [ioBroker.byd](https://github.com/TA2k/ioBroker.byd): a second reference for the command names.
+
+The first two are MIT-licensed. Their notices are in [`THIRD_PARTY_LICENSE.txt`](app/src/main/assets/THIRD_PARTY_LICENSE.txt), which also ships inside the APK.
