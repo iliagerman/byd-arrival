@@ -1,4 +1,8 @@
 plugins { id 'com.android.application' }
+// CI sets BUILD_NUMBER, which is also the release tag (v42). Local builds use a fixed development number.
+def buildNumber = (System.getenv('BUILD_NUMBER') ?: '10').toInteger()
+// Only CI has the release key. Without it, debug builds still work and release builds come out unsigned.
+def releaseKeystore = System.getenv('RELEASE_KEYSTORE')
 android {
     namespace 'local.byd.arrival'
     compileSdk 34
@@ -6,8 +10,22 @@ android {
         applicationId 'local.byd.arrival'
         minSdk 33
         targetSdk 34
-        versionCode 10
-        versionName '0.10.0'
+        versionCode buildNumber
+        versionName buildNumber.toString()
+    }
+    buildFeatures { buildConfig true }
+    signingConfigs {
+        if (releaseKeystore) {
+            release {
+                storeFile file(releaseKeystore)
+                storePassword System.getenv('RELEASE_KEYSTORE_PASSWORD')
+                keyAlias 'byd-arrival'
+                keyPassword System.getenv('RELEASE_KEYSTORE_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        release { if (releaseKeystore) signingConfig signingConfigs.release }
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17

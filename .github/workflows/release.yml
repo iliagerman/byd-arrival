@@ -1,0 +1,66 @@
+name: Release APK
+
+# Every push to main becomes a signed APK on a new GitHub release, which the app then offers to its users.
+# Documentation-only pushes are skipped: the app doesn't change, so nobody should be told to update.
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md']
+
+# One build at a time, so an older build can never finish last and become the "latest" release.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  # Android only installs an update signed by the same key, so a wrong key must never reach a release.
+  SIGNING_CERT_SHA256: 624a0b7fe91c8460919106c2d14db9f68804153c30decc8fb901ce8ef6d2e346
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the build number comes from the commit count
+
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Run tests
+        run: tools/test-core.sh
+
+      - name: Build signed APK
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+        run: |
+          # The offset keeps build numbers above the versions released before this pipeline existed.
+          export BUILD_NUMBER=$(( $(git rev-list --count HEAD) + 10 ))
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
+          export RELEASE_KEYSTORE="$RUNNER_TEMP/release.keystore"
+          printf %s "$RELEASE_KEYSTORE_BASE64" | base64 -d > "$RELEASE_KEYSTORE"
+          ./gradlew --no-daemon assembleRelease lintRelease
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/byd-arrival.apk"
+          rm "$RELEASE_KEYSTORE"
+
+      - name: Check the signing key
+        run: |
+          apksigner="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner"
+          "$apksigner" verify --print-certs "$RUNNER_TEMP/byd-arrival.apk" | grep -q "SHA-256 digest: $SIGNING_CERT_SHA256"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          checksum=$(sha256sum "$RUNNER_TEMP/byd-arrival.apk" | cut -d' ' -f1)
+          gh release create "v$BUILD_NUMBER" "$RUNNER_TEMP/byd-arrival.apk" \
+            --title "Build $BUILD_NUMBER" --target "$GITHUB_SHA" --latest \
+            --notes "SHA-256 of the APK: \`$checksum\`" --generate-notes
