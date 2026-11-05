@@ -33,6 +33,10 @@ public final class ApiTest {
         check(!BydApi.finished(new JSONObject().put("controlState",0)),"controlState 0 is pending");
         try { BydApi.finished(new JSONObject().put("controlState",2));throw new AssertionError("must reject failure"); }
         catch(IOException expected) { check(true,"controlState 2 is rejection"); }
+        double[] at=BydApi.position(new JSONObject().put("data",new JSONObject().put("latitude",32.1).put("longitude",34.8)));
+        check(at[0]==32.1 && at[1]==34.8,"car position read from nested GPS data");
+        try { BydApi.position(new JSONObject().put("data",new JSONObject().put("latitude",0).put("longitude",0)));throw new AssertionError("must reject 0,0"); }
+        catch(IOException expected) { check(expected.getMessage().startsWith("BYD "),"0,0 is no position, and the reason is shown to the user"); }
         System.out.println("PASS: "+checks+" API fixture checks");
     }
     static final class Fixture extends HttpURLConnection {

@@ -109,13 +109,18 @@ public final class BydApi {
     }
     /** A GPS response holding only the correlation id means the car has not reported a fix yet. */
     private static boolean onlySerial(JSONObject data) { return data.length()==1 && data.has("requestSerial"); }
-    /** Returns {latitude, longitude} from a GPS response, tolerating nested data and alternate field names. */
-    public double[] location(String vin) throws Exception {
-        JSONObject data=gpsInfo(vin);
+    /** Returns {latitude, longitude} of the car. */
+    public double[] location(String vin) throws Exception { return position(gpsInfo(vin)); }
+    /**
+     * Reads a GPS response, tolerating nested data and alternate field names. BYD sometimes answers 0, 0 when it
+     * has no position; that point is thousands of kilometres away and would arm auto-start, so it is rejected.
+     */
+    static double[] position(JSONObject data) throws IOException {
         JSONObject nested=data.optJSONObject("data");
         JSONObject source=nested!=null?nested:data;
         double lat=coordinate(source,"latitudeDone","latitude");
         double lon=coordinate(source,"longitudeDone","longitude");
+        if(lat==0 && lon==0) throw new IOException("BYD has no position for the car right now. Start monitoring again in a minute.");
         return new double[]{lat,lon};
     }
     private static double coordinate(JSONObject source,String primary,String fallback) throws IOException {
