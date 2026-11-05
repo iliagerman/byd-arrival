@@ -24,11 +24,11 @@ public final class MonitorService extends Service {
     /** Connected Wi-Fi name, null when none. Only touched on the main thread. */
     private String currentWifi;
     private String lastDistance="No fix";
-    private double lastMetres=-1;
     private final ConnectivityManager.NetworkCallback wifiCallback=new ConnectivityManager.NetworkCallback(ConnectivityManager.NetworkCallback.FLAG_INCLUDE_LOCATION_INFO) {
         @Override public void onCapabilitiesChanged(Network network,NetworkCapabilities caps) {
             String name=AppRuntime.wifiName(caps);
-            if(name!=null) handler.post(()->joinedWifi(name));
+            int signal=caps.getSignalStrength();
+            if(name!=null) handler.post(()->wifiChanged(name,signal));
         }
         @Override public void onLost(Network network) { handler.post(()->currentWifi=null); }
     };
@@ -104,7 +104,6 @@ public final class MonitorService extends Service {
     private void onFix(Location fix) {
         boolean wasArmed=proximity.armed();
         double metres=ProximityGate.metres(fix.getLatitude(),fix.getLongitude(),carLatitude,carLongitude);
-        lastMetres=metres;
         boolean fire=proximity.observe(metres,fix.getAccuracy(),cooldownPassed() && !onTrustedWifi());
         if(fire) AppRuntime.prefs(this).edit().putLong("lastAutoStartAt",System.currentTimeMillis()).commit();
         if(wasArmed!=proximity.armed()) {
@@ -117,17 +116,21 @@ public final class MonitorService extends Service {
     }
     private boolean onTrustedWifi() { return currentWifi!=null && AppRuntime.trustedWifi(this).contains(currentWifi); }
     /**
-     * Trusted Wi-Fi arms the trigger as if you had walked away; nothing is sent to the car. Once per connection,
-     * and not while the last reading puts you at the car, so Wi-Fi that reaches the car cannot cause repeat starts.
+     * A strong signal from a trusted Wi-Fi arms the trigger as if you had walked away; nothing is sent to the car.
+     * A weak one, as at the car, is ignored, so Wi-Fi that reaches the car cannot cause repeat starts.
+     * Android reports signal changes on a connected network too, so a signal that grows strong later still arms it.
      */
-    private void joinedWifi(String name) {
-        if(name.equals(currentWifi)) return;
+    private void wifiChanged(String name,int signal) {
+        boolean joined=!name.equals(currentWifi);
         currentWifi=name;
         if(!onTrustedWifi() || proximity.armed()) return;
-        if(lastMetres>=0 && lastMetres<=fireMetres) { AppRuntime.proximityEvent(this,"Wi-Fi "+name+" ignored: you are at the car"); return; }
+        if(signal<AppRuntime.wifiSignal(this)) {
+            if(joined) AppRuntime.proximityEvent(this,"Wi-Fi "+name+" too weak to arm: "+signal+" dBm");
+            return;
+        }
         proximity.arm();
         AppRuntime.prefs(this).edit().putBoolean("gateArmed",true).commit();
-        AppRuntime.proximityEvent(this,"Armed by Wi-Fi "+name);
+        AppRuntime.proximityEvent(this,"Armed by Wi-Fi "+name+": "+signal+" dBm");
         showProximity(lastDistance);
     }
     /** Minimum minutes between automatic starts, so passing the car again soon does not start it again. */

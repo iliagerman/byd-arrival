@@ -136,10 +136,15 @@ Phone location is often several metres off, and worse indoors. Very short distan
 
 Under **Arm when connected to Wi-Fi**, connect to a network and tap **Add current Wi-Fi**. While monitoring is on:
 
-- **The car is never started while you're on a listed network,** however close you are.
-- **Joining a listed network arms the trigger,** as if you'd walked away. Nothing is sent to the car. This is skipped if your last reading puts you within the start distance, so Wi-Fi that reaches the car can't cause repeat starts.
+- **The car is never started while you're connected to a listed network,** however close you are and however weak the signal.
+- **A strong signal from a listed network arms the trigger,** as if you'd walked away. Nothing is sent to the car. A strong signal is one at or above **Strong signal from**, default −70 dBm. If you join on a weak signal and it gets stronger, for example as you walk inside, it arms then.
+- **A weak signal is ignored,** for example your home Wi-Fi reaching the car. This way, sitting in the car can't arm the trigger and cause a repeat start.
 
 So you can walk out of your home, lose the Wi-Fi, reach the car, and it starts.
+
+To choose the value, tap **Add current Wi-Fi** inside and again at the car; each time it shows the signal where you are. Pick a value between the two. The field is saved when you leave Settings and applies straight away.
+
+Android doesn't report every small signal change, and may report fewer while the screen is off. If you join on a weak signal and walk in without using the phone, it may only arm once you do.
 
 ### Bluetooth beacon (optional)
 
@@ -169,7 +174,7 @@ Tapping either one downloads the APK in your browser. Open the file to install i
 - **"App not installed" when updating:** an older test build was signed with a different key. Uninstall it and install again. You'll need to sign in again.
 - **Sign-in fails:** check that your account works in the official app, then check the country and server in the sign-in popup. If your country's server is rejected, try the server for a neighbouring region. To change region later, use Settings → **Sign in or change region**.
 - **The distance never changes or the time stops advancing:** location updates aren't arriving. Check that location is on and set to "Allow all the time", and that the battery setting is unrestricted.
-- **Auto-start didn't fire:** look at the event line on the home screen, such as `Armed by GPS: 41 m ±8 m` or `Triggered at 12 m`. Also check whether you're still on a trusted Wi-Fi, and whether the minimum time has passed.
+- **Auto-start didn't fire:** look at the event line on the home screen, such as `Armed by GPS: 41 m ±8 m`, `Armed by Wi-Fi home: -58 dBm`, `Wi-Fi home too weak to arm: -78 dBm` or `Triggered at 12 m`. Also check whether you're still on a trusted Wi-Fi, and whether the minimum time has passed.
 
 ## For developers
 

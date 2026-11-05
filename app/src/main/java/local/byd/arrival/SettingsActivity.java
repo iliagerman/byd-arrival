@@ -44,6 +44,7 @@ public final class SettingsActivity extends Activity {
         rssi.setText(Integer.toString(prefs.getInt("rssi",-65)));
         loadAutoStart();
         showWifi();
+        ((EditText)findViewById(R.id.wifi_signal)).setText(String.valueOf(AppRuntime.wifiSignal(this)));
         start=new StartSettings(this);
         new ActionSettings(this);
         click(R.id.back,this::finish);
@@ -66,7 +67,8 @@ public final class SettingsActivity extends Activity {
         ((TextView)findViewById(R.id.app_version)).setText(getString(R.string.app_version,BuildConfig.VERSION_NAME));
     }
     @Override protected void onResume() { super.onResume(); refresh(); }
-    @Override protected void onPause() { stopScan(); super.onPause(); }
+    /** The Wi-Fi signal is read live by the monitor, so saving it on leaving takes effect without a restart. */
+    @Override protected void onPause() { stopScan(); saveWifiSignal(); super.onPause(); }
 
     private void refresh() {
         SharedPreferences prefs=AppRuntime.prefs(this);
@@ -163,7 +165,8 @@ public final class SettingsActivity extends Activity {
         ConnectivityManager.NetworkCallback probe=new ConnectivityManager.NetworkCallback(ConnectivityManager.NetworkCallback.FLAG_INCLUDE_LOCATION_INFO) {
             @Override public void onCapabilitiesChanged(Network network,NetworkCapabilities caps) {
                 String name=AppRuntime.wifiName(caps);
-                if(name!=null) runOnUiThread(()-> { if(!done[0]) { done[0]=true; cm.unregisterNetworkCallback(this); saveWifi(name); } });
+                int signal=caps.getSignalStrength();
+                if(name!=null) runOnUiThread(()-> { if(!done[0]) { done[0]=true; cm.unregisterNetworkCallback(this); saveWifi(name,signal); } });
             }
         };
         cm.registerNetworkCallback(new NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build(),probe);
@@ -173,12 +176,20 @@ public final class SettingsActivity extends Activity {
             toast("No Wi-Fi found. Connect to your Wi-Fi first.");
         },3000);
     }
-    private void saveWifi(String name) {
+    /** Shows the signal where you stand, so adding the same network again at the car helps pick the strong-signal value. */
+    private void saveWifi(String name,int signal) {
         Set<String> names=AppRuntime.trustedWifi(this);
         names.add(name);
         AppRuntime.setTrustedWifi(this,names);
         showWifi();
-        toast("Added "+name+".");
+        toast("Added "+name+". Signal here: "+signal+" dBm.");
+    }
+    /** Anything entered becomes a working value, and the field shows the result. */
+    private void saveWifiSignal() {
+        EditText field=findViewById(R.id.wifi_signal);
+        int signal=AutoStartSettings.wifiSignal(field.getText().toString());
+        AppRuntime.prefs(this).edit().putInt("wifiSignal",signal).apply();
+        field.setText(String.valueOf(signal));
     }
     private void showWifi() {
         LinearLayout list=findViewById(R.id.wifi_list);

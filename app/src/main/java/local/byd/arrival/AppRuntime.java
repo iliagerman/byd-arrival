@@ -37,6 +37,7 @@ final class AppRuntime {
     static int fireMetres(Context c) { return prefs(c).getInt("fireMetres",AutoStartSettings.DEFAULT_START); }
     static int rearmMetres(Context c) { return prefs(c).getInt("rearmMetres",AutoStartSettings.DEFAULT_REARM); }
     static int cooldownMinutes(Context c) { return prefs(c).getInt("cooldownMinutes",AutoStartSettings.DEFAULT_MINUTES); }
+    static int wifiSignal(Context c) { return prefs(c).getInt("wifiSignal",AutoStartSettings.DEFAULT_WIFI_SIGNAL); }
     static void saveAutoStart(Context c,AutoStartSettings values) {
         prefs(c).edit().putInt("fireMetres",values.start).putInt("rearmMetres",values.rearm).putInt("cooldownMinutes",values.minutes).apply();
     }

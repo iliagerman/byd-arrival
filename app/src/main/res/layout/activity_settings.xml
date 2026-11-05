@@ -87,6 +87,9 @@
             <LinearLayout android:id="@+id/wifi_list" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:orientation="vertical" />
             <Button android:id="@+id/add_wifi" style="@style/ButtonTonal" android:text="@string/add_wifi" />
+            <TextView style="@style/FieldLabel" android:text="@string/wifi_signal" />
+            <EditText android:id="@+id/wifi_signal" style="@style/Field" android:layout_marginTop="4dp" android:inputType="numberSigned" android:maxLength="4" />
+            <TextView style="@style/Body" android:text="@string/wifi_signal_hint" android:textSize="13sp" />
         </LinearLayout>
 
         <TextView style="@style/SectionHeader" android:text="@string/section_more" />

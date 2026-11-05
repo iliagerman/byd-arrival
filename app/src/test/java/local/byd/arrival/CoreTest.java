@@ -128,6 +128,13 @@ public class CoreTest {
         check(values.start == 495 && values.rearm == 500 && values.minutes == 60, "values above the maximum are lowered");
         values = new AutoStartSettings("abc", " 18 ", "-3");
         check(values.start == 15 && values.rearm == 20 && values.minutes == 5, "unreadable values use the defaults");
+        check(AutoStartSettings.wifiSignal("") == -70, "blank Wi-Fi signal uses the default −70 dBm");
+        check(AutoStartSettings.wifiSignal(" -60 ") == -60, "a sensible Wi-Fi signal is kept");
+        check(AutoStartSettings.wifiSignal("60") == -60, "a missing minus sign is added");
+        check(AutoStartSettings.wifiSignal("−65") == -65, "a typographic minus sign is accepted");
+        check(AutoStartSettings.wifiSignal("-10") == -30, "a signal stronger than −30 dBm is lowered");
+        check(AutoStartSettings.wifiSignal("-120") == -95, "a signal weaker than −95 dBm is raised");
+        check(AutoStartSettings.wifiSignal("strong") == -70, "an unreadable Wi-Fi signal uses the default");
         check(UpdateCheck.buildOf("v42") == 42, "release tag holds the build number");
         check(UpdateCheck.newerBuild("v42", 41) == 42, "a higher build on GitHub is an update");
         check(UpdateCheck.newerBuild("v42", 42) == 0, "the same build is not an update");
