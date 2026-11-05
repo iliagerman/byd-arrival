@@ -70,9 +70,6 @@
             <TextView style="@style/Body" android:text="@string/arrival_body" />
             <TextView style="@style/FieldLabel" android:text="@string/arrival_action" />
             <Spinner android:id="@+id/arrival_action" android:layout_width="match_parent" android:layout_height="48dp" android:layout_marginTop="4dp" />
-            <Switch android:id="@+id/test_mode" android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:layout_marginTop="12dp" android:text="@string/test_mode" android:textColor="@color/on_surface"
-                android:textSize="15sp" />
             <TextView style="@style/FieldLabel" android:text="@string/fire_metres" />
             <EditText android:id="@+id/fire_metres" style="@style/Field" android:layout_marginTop="4dp" android:inputType="number" android:maxLength="3" />
             <TextView style="@style/FieldLabel" android:text="@string/rearm_metres" />

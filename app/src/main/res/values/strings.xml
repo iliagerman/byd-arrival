@@ -20,9 +20,8 @@
     <string name="change_car">Change car</string>
     <string name="temperature">A/C on button temperature (°C)</string>
     <string name="arrival_title">Auto-start near the car</string>
-    <string name="arrival_body">Starts the car when your phone gets within the start distance. It can start again only after you get further than the re-arm distance and the minimum minutes have passed. Start with test mode on: it only sends a notification.</string>
-    <string name="arrival_warning">Phone location can be off by several metres. Anyone holding your phone can trigger it. Start in test mode.</string>
-    <string name="test_mode">Test mode: notify only, never control the car</string>
+    <string name="arrival_body">Starts the car when your phone gets within the start distance. It can start again only after you get further than the re-arm distance and the minimum minutes have passed.</string>
+    <string name="arrival_warning">Phone location can be off by several metres. Anyone holding your phone can trigger it.</string>
     <string name="fire_metres">Start the car when within (metres)</string>
     <string name="rearm_metres">Re-arm after getting further than (metres)</string>
     <string name="cooldown_minutes">Minimum minutes between automatic starts (1–60)</string>
@@ -68,7 +67,7 @@
     <string name="welcome_next">Next</string>
     <string name="welcome_back">Back</string>
     <string name="welcome_not_now">Not now</string>
-    <string name="welcome_try">Start in test mode</string>
+    <string name="welcome_turn_on">Turn on auto-start</string>
     <string name="welcome_how_title">Auto-start near your car</string>
     <string name="welcome_how_body">BYD Arrival can start your car as you walk up to it, using your phone\'s location and the car\'s parked position.</string>
     <string name="welcome_up_title">Walk up</string>
@@ -82,9 +81,9 @@
     <string name="welcome_start_hint">Phone location can be several metres off, so very short distances may not work reliably.</string>
     <string name="welcome_rearm_hint">Must be further than the start distance. The app raises it if needed.</string>
     <string name="welcome_minutes_hint">Stops it starting again if you walk past the car soon after.</string>
-    <string name="welcome_try_title">Try it safely</string>
+    <string name="welcome_ready_title">Ready to turn on</string>
     <string name="welcome_summary">Starts within %1$d m, re-arms beyond %2$d m, and starts at most once every %3$d min.</string>
-    <string name="welcome_try_body">Test mode only sends a notification when it would start the car. Walk away and come back to see how it behaves. When you\'re happy, turn Test mode off in Settings.</string>
+    <string name="welcome_ready_body">Your car will start for real when you walk up to it. It has to see you walk away first, so turning it on beside the car does nothing. To turn it off, tap Stop in its notification.</string>
     <string name="welcome_location_body">Android will ask for location access. Choose Allow all the time so it works with the screen off.</string>
     <string name="welcome_location_needed">Auto-start needs location access. You can start it later in Settings.</string>
     <string name="phone_title">Phone</string>

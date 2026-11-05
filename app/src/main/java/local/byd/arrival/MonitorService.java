@@ -157,13 +157,7 @@ public final class MonitorService extends Service {
         AppRuntime.status(this,"Bluetooth monitoring started. Leave signal range for 60 seconds before approaching.");
     }
     private void stopWithStatus(String message) { AppRuntime.status(this,message); stopSelf(); }
-    private void arrival() {
-        if(AppRuntime.prefs(this).getBoolean("detectionOnly",true)) {
-            AppRuntime.status(this,"Arrival detected. Test mode: no commands sent.");
-        } else {
-            AppRuntime.execute(this,List.of(AppRuntime.arrivalAction(this)),true,()->{});
-        }
-    }
+    private void arrival() { AppRuntime.execute(this,List.of(AppRuntime.arrivalAction(this)),true,()->{}); }
     @Override public void onDestroy() {
         handler.removeCallbacksAndMessages(null);
         if(locations!=null) locations.removeUpdates(gpsListener);

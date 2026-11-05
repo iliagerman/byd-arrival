@@ -24,7 +24,6 @@ public final class SettingsActivity extends Activity {
     private static final int GUIDE=5;
     private EditText rssi;
     private StartSettings start;
-    private Switch testMode;
     private TextView accountState,beacon;
     private LinearLayout devices;
     private final Map<String,TextView> found=new LinkedHashMap<>();
@@ -40,10 +39,9 @@ public final class SettingsActivity extends Activity {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
         setContentView(R.layout.activity_settings);
         SharedPreferences prefs=AppRuntime.prefs(this);
-        rssi=findViewById(R.id.rssi); testMode=findViewById(R.id.test_mode);
+        rssi=findViewById(R.id.rssi);
         accountState=findViewById(R.id.account_state); beacon=findViewById(R.id.beacon); devices=findViewById(R.id.devices);
         rssi.setText(Integer.toString(prefs.getInt("rssi",-65)));
-        testMode.setChecked(prefs.getBoolean("detectionOnly",true));
         loadAutoStart();
         showWifi();
         start=new StartSettings(this);
@@ -96,10 +94,7 @@ public final class SettingsActivity extends Activity {
     }
     @Override protected void onActivityResult(int code,int result,Intent data) {
         refresh();
-        if(code==GUIDE) { // the walkthrough may have changed these
-            testMode.setChecked(AppRuntime.prefs(this).getBoolean("detectionOnly",true));
-            loadAutoStart();
-        }
+        if(code==GUIDE) loadAutoStart(); // the walkthrough may have changed these
     }
     /** One permission line: a green ✓ when granted, a red ✗ when missing. */
     private void mark(android.text.SpannableStringBuilder out,boolean ok,String name) {
@@ -139,17 +134,12 @@ public final class SettingsActivity extends Activity {
     }
     /** GPS needs only the car and location permission. Bluetooth also needs a selected signal and a threshold. */
     private void enableMonitor(String mode) {
+        if(!AppRuntime.ready(this)) { toast("Sign in and choose your car first."); return; }
         if(!Permissions.gpsReady(this)) { toast("Grant the permissions first."); Permissions.askNext(this); return; }
         if("ble".equals(mode) && !Permissions.bluetoothReady(this)) { toast("Tap Scan to allow nearby devices first."); return; }
         if("ble".equals(mode) && !beaconReady()) return;
         if("gps".equals(mode)) saveAutoStart();
-        boolean test=testMode.isChecked();
-        if(!test && !AppRuntime.ready(this)) { toast("Live mode needs a signed-in car."); return; }
-        AppRuntime.prefs(this).edit().putBoolean("detectionOnly",test).apply();
-        if(test) startMonitor(mode);
-        else new AlertDialog.Builder(this).setTitle("Enable live car control?")
-            .setMessage("When you arrive, the auto-start action runs on your car even while the phone is locked.")
-            .setPositiveButton("Enable",(d,w)->startMonitor(mode)).setNegativeButton("Cancel",null).show();
+        startMonitor(mode);
     }
     private void loadAutoStart() {
         ((EditText)findViewById(R.id.fire_metres)).setText(String.valueOf(AppRuntime.fireMetres(this)));

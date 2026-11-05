@@ -37,12 +37,12 @@
             <TextView style="@style/Body" android:text="@string/welcome_minutes_hint" android:textSize="13sp" />
         </LinearLayout>
 
-        <LinearLayout android:id="@+id/page_try" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
-            <TextView style="@style/WelcomeTitle" android:text="@string/welcome_try_title" />
+        <LinearLayout android:id="@+id/page_ready" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+            <TextView style="@style/WelcomeTitle" android:text="@string/welcome_ready_title" />
             <LinearLayout style="@style/Card">
                 <TextView android:id="@+id/summary" style="@style/Body" android:layout_marginTop="0dp" android:textColor="@color/on_surface" android:textSize="16sp" />
             </LinearLayout>
-            <TextView style="@style/Body" android:layout_marginTop="16dp" android:text="@string/welcome_try_body" />
+            <TextView style="@style/Body" android:layout_marginTop="16dp" android:text="@string/welcome_ready_body" />
             <TextView style="@style/Body" android:layout_marginTop="12dp" android:text="@string/welcome_location_body" />
         </LinearLayout>
 

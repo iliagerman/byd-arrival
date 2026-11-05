@@ -56,7 +56,7 @@ To check a download, compare it with the SHA-256 in that [release's notes](https
 
 1. **Sign in.** Choose your country, then enter your BYD email, password and six-digit control PIN. The country selects the server for you; change the server only if sign-in fails. The popup stays open until BYD accepts the login.
 2. **Pick your car.** If the account has only one car, it's selected for you.
-3. **Set up auto-start.** A short walkthrough explains auto-start, lets you set its distances, and offers a first try in test mode. You can skip it and reopen it later with Settings → **Walk me through setup**.
+3. **Set up auto-start.** A short walkthrough explains auto-start, lets you set its distances, and turns it on. You can skip it and reopen it later with Settings → **Walk me through setup**.
 4. **Grant permissions.** The app asks for each in turn:
 
 | Permission | Why |
@@ -111,9 +111,8 @@ This runs an action when your phone comes close to the parked car. It's off unti
    - **Start the car when within:** default 15 m.
    - **Re-arm after getting further than:** default 20 m.
    - **Minimum minutes between automatic starts:** default 5.
-3. Leave **Test mode** on at first. It sends a notification instead of controlling the car.
-4. Tap **Start monitoring**. The app reads the car's position, then follows your phone's location.
-5. Walk away and come back to see how it behaves, then turn Test mode off and start monitoring again.
+3. Tap **Start monitoring**. The app reads the car's position, then follows your phone's location.
+4. Walk away. The next time you come within the start distance, the action runs on your car.
 
 You can't save values that don't work together, because the app adjusts them for you and shows the result:
 
