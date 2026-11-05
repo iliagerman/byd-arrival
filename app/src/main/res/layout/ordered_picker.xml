@@ -1,0 +1,12 @@
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:paddingHorizontal="24dp" android:paddingTop="8dp">
+        <TextView android:id="@+id/picker_name_label" style="@style/FieldLabel" android:layout_marginTop="0dp" android:text="@string/custom_name" />
+        <EditText android:id="@+id/picker_name" style="@style/Field" android:layout_marginTop="4dp" android:inputType="textCapSentences" android:maxLength="24" />
+        <TextView android:id="@+id/picker_hint" style="@style/FieldLabel" />
+        <TextView android:id="@+id/picker_order" style="@style/Body" android:textColor="@color/on_surface" />
+        <LinearLayout android:id="@+id/picker_boxes" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:layout_marginTop="4dp" android:orientation="vertical" />
+    </LinearLayout>
+</ScrollView>

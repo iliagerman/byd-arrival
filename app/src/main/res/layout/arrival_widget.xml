@@ -1,0 +1,102 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@android:id/background"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:background="@drawable/bg_widget"
+    android:orientation="vertical" android:padding="8dp">
+
+    <LinearLayout android:id="@+id/w_header" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:gravity="center_vertical" android:orientation="horizontal" android:paddingHorizontal="6dp" android:paddingBottom="4dp">
+        <TextView android:id="@+id/w_title" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:ellipsize="end" android:fontFamily="sans-serif-medium" android:maxLines="1" android:text="@string/my_car"
+            android:textColor="@color/on_surface" android:textSize="14sp" />
+        <ImageView android:id="@+id/w_prox_icon" android:layout_width="14dp" android:layout_height="14dp"
+            android:importantForAccessibility="no" android:src="@drawable/ic_unarmed" />
+        <TextView android:id="@+id/w_prox_text" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginStart="4dp" android:maxLines="1" android:textColor="@color/primary" android:textSize="12sp" />
+    </LinearLayout>
+
+    <LinearLayout android:id="@+id/w_row1" android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:orientation="horizontal">
+        <FrameLayout android:id="@+id/w_tile1" style="@style/WidgetTile">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent"
+                android:gravity="center" android:orientation="vertical">
+                <ImageView android:id="@+id/w_icon1" style="@style/WidgetIcon" />
+                <TextView android:id="@+id/w_label1" style="@style/WidgetLabel" />
+            </LinearLayout>
+            <TextView android:id="@+id/w_badge1" style="@style/WidgetBadge" />
+        </FrameLayout>
+        <FrameLayout android:id="@+id/w_tile2" style="@style/WidgetTile">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent"
+                android:gravity="center" android:orientation="vertical">
+                <ImageView android:id="@+id/w_icon2" style="@style/WidgetIcon" />
+                <TextView android:id="@+id/w_label2" style="@style/WidgetLabel" />
+            </LinearLayout>
+            <TextView android:id="@+id/w_badge2" style="@style/WidgetBadge" />
+        </FrameLayout>
+        <FrameLayout android:id="@+id/w_tile3" style="@style/WidgetTile">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent"
+                android:gravity="center" android:orientation="vertical">
+                <ImageView android:id="@+id/w_icon3" style="@style/WidgetIcon" />
+                <TextView android:id="@+id/w_label3" style="@style/WidgetLabel" />
+            </LinearLayout>
+            <TextView android:id="@+id/w_badge3" style="@style/WidgetBadge" />
+        </FrameLayout>
+        <FrameLayout android:id="@+id/w_tile4" style="@style/WidgetTile">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent"
+                android:gravity="center" android:orientation="vertical">
+                <ImageView android:id="@+id/w_icon4" style="@style/WidgetIcon" />
+                <TextView android:id="@+id/w_label4" style="@style/WidgetLabel" />
+            </LinearLayout>
+            <TextView android:id="@+id/w_badge4" style="@style/WidgetBadge" />
+        </FrameLayout>
+        <FrameLayout android:id="@+id/w_tile5" style="@style/WidgetTile">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent"
+                android:gravity="center" android:orientation="vertical">
+                <ImageView android:id="@+id/w_icon5" style="@style/WidgetIcon" />
+                <TextView android:id="@+id/w_label5" style="@style/WidgetLabel" />
+            </LinearLayout>
+            <TextView android:id="@+id/w_badge5" style="@style/WidgetBadge" />
+        </FrameLayout>
+    </LinearLayout>
+    <LinearLayout android:id="@+id/w_row2" android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:orientation="horizontal">
+        <FrameLayout android:id="@+id/w_tile6" style="@style/WidgetTile">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent"
+                android:gravity="center" android:orientation="vertical">
+                <ImageView android:id="@+id/w_icon6" style="@style/WidgetIcon" />
+                <TextView android:id="@+id/w_label6" style="@style/WidgetLabel" />
+            </LinearLayout>
+            <TextView android:id="@+id/w_badge6" style="@style/WidgetBadge" />
+        </FrameLayout>
+        <FrameLayout android:id="@+id/w_tile7" style="@style/WidgetTile">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent"
+                android:gravity="center" android:orientation="vertical">
+                <ImageView android:id="@+id/w_icon7" style="@style/WidgetIcon" />
+                <TextView android:id="@+id/w_label7" style="@style/WidgetLabel" />
+            </LinearLayout>
+            <TextView android:id="@+id/w_badge7" style="@style/WidgetBadge" />
+        </FrameLayout>
+        <FrameLayout android:id="@+id/w_tile8" style="@style/WidgetTile">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent"
+                android:gravity="center" android:orientation="vertical">
+                <ImageView android:id="@+id/w_icon8" style="@style/WidgetIcon" />
+                <TextView android:id="@+id/w_label8" style="@style/WidgetLabel" />
+            </LinearLayout>
+            <TextView android:id="@+id/w_badge8" style="@style/WidgetBadge" />
+        </FrameLayout>
+        <FrameLayout android:id="@+id/w_tile9" style="@style/WidgetTile">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent"
+                android:gravity="center" android:orientation="vertical">
+                <ImageView android:id="@+id/w_icon9" style="@style/WidgetIcon" />
+                <TextView android:id="@+id/w_label9" style="@style/WidgetLabel" />
+            </LinearLayout>
+            <TextView android:id="@+id/w_badge9" style="@style/WidgetBadge" />
+        </FrameLayout>
+        <FrameLayout android:id="@+id/w_tile10" style="@style/WidgetTile">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent"
+                android:gravity="center" android:orientation="vertical">
+                <ImageView android:id="@+id/w_icon10" style="@style/WidgetIcon" />
+                <TextView android:id="@+id/w_label10" style="@style/WidgetLabel" />
+            </LinearLayout>
+            <TextView android:id="@+id/w_badge10" style="@style/WidgetBadge" />
+        </FrameLayout>
+    </LinearLayout>
+</LinearLayout>

@@ -1,0 +1,114 @@
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:paddingHorizontal="16dp" android:paddingVertical="8dp">
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="56dp"
+            android:gravity="center_vertical" android:orientation="horizontal">
+            <ImageButton android:id="@+id/back" android:layout_width="48dp" android:layout_height="48dp"
+                android:layout_marginStart="-8dp" android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/back" android:src="@drawable/ic_back" android:tint="@color/on_surface" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:layout_marginStart="8dp" android:fontFamily="sans-serif-medium" android:text="@string/settings"
+                android:textColor="@color/on_surface" android:textSize="22sp" />
+        </LinearLayout>
+
+        <TextView style="@style/SectionHeader" android:text="@string/section_setup" />
+        <LinearLayout style="@style/Card">
+            <TextView style="@style/CardTitle" android:text="@string/permissions_title" />
+            <TextView android:id="@+id/permission_state" style="@style/Body" android:layout_marginTop="8dp"
+                android:textColor="@color/on_surface" android:textSize="15sp" />
+            <Button android:id="@+id/grant" style="@style/ButtonPrimary" android:text="@string/grant_permissions" />
+        </LinearLayout>
+
+        <LinearLayout style="@style/Card">
+            <TextView style="@style/CardTitle" android:text="@string/account_title" />
+            <TextView android:id="@+id/account_state" style="@style/Body" />
+            <Button android:id="@+id/save_account" style="@style/ButtonPrimary" android:text="@string/save_account" />
+            <Button android:id="@+id/change_car" style="@style/ButtonText" android:text="@string/change_car" />
+        </LinearLayout>
+
+        <TextView style="@style/SectionHeader" android:text="@string/section_start" />
+        <LinearLayout style="@style/Card">
+            <TextView style="@style/CardTitle" android:text="@string/start_title" />
+            <TextView style="@style/Body" android:text="@string/start_body" />
+            <TextView style="@style/FieldLabel" android:text="@string/engine_minutes" />
+            <Spinner android:id="@+id/engine_minutes" android:layout_width="match_parent" android:layout_height="48dp" android:layout_marginTop="4dp" />
+            <TextView style="@style/FieldLabel" android:text="@string/cold_below" />
+            <EditText android:id="@+id/cold_below" style="@style/Field" android:layout_marginTop="4dp" android:inputType="number" android:maxLength="2" />
+            <TextView style="@style/FieldLabel" android:text="@string/warm_from" />
+            <EditText android:id="@+id/warm_from" style="@style/Field" android:layout_marginTop="4dp" android:inputType="number" android:maxLength="2" />
+            <TextView style="@style/FieldLabel" android:text="@string/hot_above" />
+            <EditText android:id="@+id/hot_above" style="@style/Field" android:layout_marginTop="4dp" android:inputType="number" android:maxLength="2" />
+            <LinearLayout android:id="@+id/climate_levels" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:orientation="vertical" />
+            <TextView style="@style/FieldLabel" android:text="@string/temperature" />
+            <EditText android:id="@+id/temperature" style="@style/Field" android:layout_marginTop="4dp" android:inputType="number" android:maxLength="2" />
+            <Button android:id="@+id/save_start" style="@style/ButtonPrimary" android:text="@string/save_start" />
+        </LinearLayout>
+
+        <TextView style="@style/SectionHeader" android:text="@string/section_actions" />
+        <LinearLayout style="@style/Card">
+            <TextView style="@style/CardTitle" android:text="@string/custom_title" />
+            <TextView style="@style/Body" android:text="@string/custom_body" />
+            <LinearLayout android:id="@+id/custom_list" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="vertical" />
+            <Button android:id="@+id/new_custom" style="@style/ButtonTonal" android:text="@string/new_custom" />
+        </LinearLayout>
+
+        <LinearLayout style="@style/Card">
+            <TextView style="@style/CardTitle" android:text="@string/widget_title" />
+            <TextView style="@style/FieldLabel" android:text="@string/widget_tiles" />
+            <TextView android:id="@+id/widget_tiles" style="@style/Body" android:textColor="@color/on_surface" />
+            <Button android:id="@+id/choose_tiles" style="@style/ButtonTonal" android:text="@string/choose_tiles" />
+            <Button android:id="@+id/add_widget" style="@style/ButtonText" android:text="@string/add_widget" />
+        </LinearLayout>
+
+        <TextView style="@style/SectionHeader" android:text="@string/section_auto" />
+        <LinearLayout style="@style/Card">
+            <TextView style="@style/CardTitle" android:text="@string/arrival_title" />
+            <TextView style="@style/Body" android:text="@string/arrival_body" />
+            <TextView style="@style/FieldLabel" android:text="@string/arrival_action" />
+            <Spinner android:id="@+id/arrival_action" android:layout_width="match_parent" android:layout_height="48dp" android:layout_marginTop="4dp" />
+            <Switch android:id="@+id/test_mode" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="12dp" android:text="@string/test_mode" android:textColor="@color/on_surface"
+                android:textSize="15sp" />
+            <TextView style="@style/FieldLabel" android:text="@string/fire_metres" />
+            <EditText android:id="@+id/fire_metres" style="@style/Field" android:layout_marginTop="4dp" android:inputType="number" android:maxLength="3" />
+            <TextView style="@style/FieldLabel" android:text="@string/rearm_metres" />
+            <EditText android:id="@+id/rearm_metres" style="@style/Field" android:layout_marginTop="4dp" android:inputType="number" android:maxLength="3" />
+            <TextView style="@style/FieldLabel" android:text="@string/cooldown_minutes" />
+            <EditText android:id="@+id/cooldown_minutes" style="@style/Field" android:layout_marginTop="4dp" android:inputType="number" android:maxLength="2" />
+            <Button android:id="@+id/monitor_gps" style="@style/ButtonPrimary" android:text="@string/monitor_gps" />
+            <Button android:id="@+id/monitor_stop" style="@style/ButtonText" android:text="@string/monitor_stop" />
+        </LinearLayout>
+
+        <LinearLayout style="@style/Card">
+            <TextView style="@style/CardTitle" android:text="@string/wifi_title" />
+            <TextView style="@style/Body" android:text="@string/wifi_body" />
+            <LinearLayout android:id="@+id/wifi_list" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:orientation="vertical" />
+            <Button android:id="@+id/add_wifi" style="@style/ButtonTonal" android:text="@string/add_wifi" />
+        </LinearLayout>
+
+        <TextView style="@style/SectionHeader" android:text="@string/section_more" />
+        <LinearLayout style="@style/Card">
+            <TextView style="@style/CardTitle" android:text="@string/beacon_title" />
+            <TextView style="@style/Body" android:text="@string/beacon_body" />
+            <TextView android:id="@+id/beacon" style="@style/Body" android:layout_marginTop="8dp"
+                android:textColor="@color/on_surface" />
+            <Button android:id="@+id/scan" style="@style/ButtonTonal" android:text="@string/scan" />
+            <LinearLayout android:id="@+id/devices" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:orientation="vertical" />
+            <TextView style="@style/FieldLabel" android:text="@string/threshold" />
+            <EditText android:id="@+id/rssi" style="@style/Field" android:layout_marginTop="4dp" android:inputType="numberSigned" android:maxLength="3" />
+            <Button android:id="@+id/monitor_ble" style="@style/ButtonTonal" android:text="@string/monitor_ble" />
+        </LinearLayout>
+
+        <LinearLayout style="@style/Card">
+            <TextView style="@style/CardTitle" android:text="@string/phone_title" />
+            <Button android:id="@+id/forget" style="@style/ButtonText" android:text="@string/forget" android:textColor="@color/danger" />
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>
