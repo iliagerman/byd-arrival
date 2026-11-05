@@ -84,7 +84,7 @@ public final class MonitorService extends Service {
         }
         carLatitude=car[0]; carLongitude=car[1];
         android.content.SharedPreferences prefs=AppRuntime.prefs(this);
-        fireMetres=prefs.getInt("fireMetres",15); rearmMetres=prefs.getInt("rearmMetres",30);
+        fireMetres=AppRuntime.fireMetres(this); rearmMetres=AppRuntime.rearmMetres(this);
         proximity=new ProximityGate(fireMetres,rearmMetres,prefs.getBoolean("gateArmed",false));
         showProximity("No fix");
         gpsListener=new LocationListener() {
@@ -133,7 +133,7 @@ public final class MonitorService extends Service {
     /** Minimum minutes between automatic starts, so passing the car again soon does not start it again. */
     private boolean cooldownPassed() {
         android.content.SharedPreferences prefs=AppRuntime.prefs(this);
-        long minutes=prefs.getInt("cooldownMinutes",5);
+        long minutes=AppRuntime.cooldownMinutes(this);
         return System.currentTimeMillis()-prefs.getLong("lastAutoStartAt",0)>=minutes*60000L;
     }
     private void showProximity(String distance) {

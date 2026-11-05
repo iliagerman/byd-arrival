@@ -1,0 +1,53 @@
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:paddingHorizontal="20dp" android:paddingVertical="24dp">
+        <ImageView android:layout_width="56dp" android:layout_height="56dp" android:importantForAccessibility="no"
+            android:src="@drawable/ic_logo" />
+        <TextView android:id="@+id/step" style="@style/SectionHeader" android:layout_marginTop="16dp" android:paddingHorizontal="0dp" />
+
+        <LinearLayout android:id="@+id/page_how" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+            <TextView style="@style/WelcomeTitle" android:text="@string/welcome_how_title" />
+            <TextView style="@style/Body" android:text="@string/welcome_how_body" />
+            <LinearLayout style="@style/Card">
+                <TextView style="@style/CardTitle" android:text="@string/welcome_up_title" />
+                <TextView style="@style/Body" android:text="@string/welcome_up_body" />
+            </LinearLayout>
+            <LinearLayout style="@style/Card">
+                <TextView style="@style/CardTitle" android:text="@string/welcome_away_title" />
+                <TextView style="@style/Body" android:text="@string/welcome_away_body" />
+            </LinearLayout>
+            <LinearLayout style="@style/Card">
+                <TextView style="@style/CardTitle" android:text="@string/welcome_wifi_title" />
+                <TextView style="@style/Body" android:text="@string/welcome_wifi_body" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout android:id="@+id/page_values" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+            <TextView style="@style/WelcomeTitle" android:text="@string/welcome_values_title" />
+            <TextView style="@style/Body" android:text="@string/welcome_values_body" />
+            <TextView style="@style/FieldLabel" android:text="@string/fire_metres" />
+            <EditText android:id="@+id/start_distance" style="@style/Field" android:layout_marginTop="4dp" android:inputType="number" android:maxLength="3" />
+            <TextView style="@style/Body" android:text="@string/welcome_start_hint" android:textSize="13sp" />
+            <TextView style="@style/FieldLabel" android:text="@string/rearm_metres" />
+            <EditText android:id="@+id/rearm_distance" style="@style/Field" android:layout_marginTop="4dp" android:inputType="number" android:maxLength="3" />
+            <TextView style="@style/Body" android:text="@string/welcome_rearm_hint" android:textSize="13sp" />
+            <TextView style="@style/FieldLabel" android:text="@string/cooldown_minutes" />
+            <EditText android:id="@+id/minimum_minutes" style="@style/Field" android:layout_marginTop="4dp" android:inputType="number" android:maxLength="2" />
+            <TextView style="@style/Body" android:text="@string/welcome_minutes_hint" android:textSize="13sp" />
+        </LinearLayout>
+
+        <LinearLayout android:id="@+id/page_try" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+            <TextView style="@style/WelcomeTitle" android:text="@string/welcome_try_title" />
+            <LinearLayout style="@style/Card">
+                <TextView android:id="@+id/summary" style="@style/Body" android:layout_marginTop="0dp" android:textColor="@color/on_surface" android:textSize="16sp" />
+            </LinearLayout>
+            <TextView style="@style/Body" android:layout_marginTop="16dp" android:text="@string/welcome_try_body" />
+            <TextView style="@style/Body" android:layout_marginTop="12dp" android:text="@string/welcome_location_body" />
+        </LinearLayout>
+
+        <Button android:id="@+id/next" style="@style/ButtonPrimary" android:layout_marginTop="24dp" />
+        <Button android:id="@+id/back" style="@style/ButtonText" android:text="@string/welcome_back" />
+        <Button android:id="@+id/not_now" style="@style/ButtonText" android:text="@string/welcome_not_now" />
+    </LinearLayout>
+</ScrollView>

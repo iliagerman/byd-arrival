@@ -21,6 +21,7 @@ import java.util.*;
 
 /** Account, start car, actions, widget, automation and phone settings. Secure window: credentials are typed here. */
 public final class SettingsActivity extends Activity {
+    private static final int GUIDE=5;
     private EditText rssi;
     private StartSettings start;
     private Switch testMode;
@@ -43,9 +44,7 @@ public final class SettingsActivity extends Activity {
         accountState=findViewById(R.id.account_state); beacon=findViewById(R.id.beacon); devices=findViewById(R.id.devices);
         rssi.setText(Integer.toString(prefs.getInt("rssi",-65)));
         testMode.setChecked(prefs.getBoolean("detectionOnly",true));
-        ((EditText)findViewById(R.id.fire_metres)).setText(Integer.toString(prefs.getInt("fireMetres",15)));
-        ((EditText)findViewById(R.id.rearm_metres)).setText(Integer.toString(prefs.getInt("rearmMetres",30)));
-        ((EditText)findViewById(R.id.cooldown_minutes)).setText(Integer.toString(prefs.getInt("cooldownMinutes",5)));
+        loadAutoStart();
         showWifi();
         start=new StartSettings(this);
         new ActionSettings(this);
@@ -59,6 +58,7 @@ public final class SettingsActivity extends Activity {
         click(R.id.scan,this::scan);
         click(R.id.add_wifi,this::addCurrentWifi);
         click(R.id.monitor_gps,()->enableMonitor("gps"));
+        click(R.id.auto_guide,()->startActivityForResult(new Intent(this,WelcomeActivity.class),GUIDE));
         click(R.id.monitor_ble,()->enableMonitor("ble"));
         click(R.id.monitor_stop,()-> { stopService(new Intent(this,MonitorService.class)); toast("Monitoring stopped."); });
         click(R.id.add_widget,this::addWidget);
@@ -94,7 +94,13 @@ public final class SettingsActivity extends Activity {
         refresh();
         Permissions.continueAfter(this,code,results);
     }
-    @Override protected void onActivityResult(int code,int result,Intent data) { refresh(); }
+    @Override protected void onActivityResult(int code,int result,Intent data) {
+        refresh();
+        if(code==GUIDE) { // the walkthrough may have changed these
+            testMode.setChecked(AppRuntime.prefs(this).getBoolean("detectionOnly",true));
+            loadAutoStart();
+        }
+    }
     /** One permission line: a green ✓ when granted, a red ✗ when missing. */
     private void mark(android.text.SpannableStringBuilder out,boolean ok,String name) {
         if(out.length()>0) out.append("\n");
@@ -136,7 +142,7 @@ public final class SettingsActivity extends Activity {
         if(!Permissions.gpsReady(this)) { toast("Grant the permissions first."); Permissions.askNext(this); return; }
         if("ble".equals(mode) && !Permissions.bluetoothReady(this)) { toast("Tap Scan to allow nearby devices first."); return; }
         if("ble".equals(mode) && !beaconReady()) return;
-        if("gps".equals(mode) && !distancesReady()) return;
+        if("gps".equals(mode)) saveAutoStart();
         boolean test=testMode.isChecked();
         if(!test && !AppRuntime.ready(this)) { toast("Live mode needs a signed-in car."); return; }
         AppRuntime.prefs(this).edit().putBoolean("detectionOnly",test).apply();
@@ -145,20 +151,16 @@ public final class SettingsActivity extends Activity {
             .setMessage("When you arrive, the auto-start action runs on your car even while the phone is locked.")
             .setPositiveButton("Enable",(d,w)->startMonitor(mode)).setNegativeButton("Cancel",null).show();
     }
-    /** Start distance 3 m or more; re-arm distance larger than it, at most 500 m. */
-    private boolean distancesReady() {
-        int fire, rearm;
-        try {
-            fire=Integer.parseInt(((EditText)findViewById(R.id.fire_metres)).getText().toString());
-            rearm=Integer.parseInt(((EditText)findViewById(R.id.rearm_metres)).getText().toString());
-        } catch(NumberFormatException e) { fire=0; rearm=0; }
-        int cooldown;
-        try { cooldown=Integer.parseInt(((EditText)findViewById(R.id.cooldown_minutes)).getText().toString()); }
-        catch(NumberFormatException e) { cooldown=0; }
-        if(fire<3 || rearm<=fire || rearm>500) { toast("Start distance must be at least 3 m, and re-arm distance larger than it (up to 500 m)."); return false; }
-        if(cooldown<1 || cooldown>60) { toast("Minutes between starts must be 1 to 60."); return false; }
-        AppRuntime.prefs(this).edit().putInt("fireMetres",fire).putInt("rearmMetres",rearm).putInt("cooldownMinutes",cooldown).apply();
-        return true;
+    private void loadAutoStart() {
+        ((EditText)findViewById(R.id.fire_metres)).setText(String.valueOf(AppRuntime.fireMetres(this)));
+        ((EditText)findViewById(R.id.rearm_metres)).setText(String.valueOf(AppRuntime.rearmMetres(this)));
+        ((EditText)findViewById(R.id.cooldown_minutes)).setText(String.valueOf(AppRuntime.cooldownMinutes(this)));
+    }
+    /** Saves the auto-start values. Anything that doesn't work together is adjusted, and the fields show the result. */
+    private void saveAutoStart() {
+        AppRuntime.saveAutoStart(this,new AutoStartSettings(((EditText)findViewById(R.id.fire_metres)).getText().toString(),
+            ((EditText)findViewById(R.id.rearm_metres)).getText().toString(),((EditText)findViewById(R.id.cooldown_minutes)).getText().toString()));
+        loadAutoStart();
     }
     /**
      * Adds the Wi-Fi the phone is on now. Android hides the name from a direct lookup, so a short-lived

@@ -11,6 +11,7 @@ import java.util.*;
 
 /** Home screen: live status and one-tap car actions, including custom actions. Settings live in SettingsActivity. */
 public final class MainActivity extends Activity implements SharedPreferences.OnSharedPreferenceChangeListener {
+    private static final int WELCOME=10;
     private final List<View> actions=new ArrayList<>();
     private View start;
     private GridLayout grid;
@@ -40,10 +41,18 @@ public final class MainActivity extends Activity implements SharedPreferences.On
     }
     /** On launch: sign in if there are no credentials, pick a car if none is chosen, then ask for missing permissions. */
     private void firstRunChecks() {
-        Runnable permissions=()-> { if(!Permissions.complete(this)) Permissions.askNext(this); };
-        if(!SignIn.signedIn(this)) SignIn.show(this,permissions);
-        else if(!AppRuntime.ready(this)) SignIn.changeCar(this,permissions);
-        else permissions.run();
+        if(!SignIn.signedIn(this)) SignIn.show(this,this::afterSignIn);
+        else if(!AppRuntime.ready(this)) SignIn.changeCar(this,this::afterSignIn);
+        else askPermissions();
+    }
+    /** The first login walks through auto-start once before asking for permissions. */
+    private void afterSignIn() {
+        if(AppRuntime.prefs(this).getBoolean("welcomeDone",false)) askPermissions();
+        else startActivityForResult(new Intent(this,WelcomeActivity.class),WELCOME);
+    }
+    private void askPermissions() { if(!Permissions.complete(this)) Permissions.askNext(this); }
+    @Override protected void onActivityResult(int code,int result,Intent data) {
+        if(code==WELCOME && result!=WelcomeActivity.DECLINED) askPermissions();
     }
     @Override public void onRequestPermissionsResult(int code,String[] permissions,int[] results) {
         Permissions.continueAfter(this,code,results);

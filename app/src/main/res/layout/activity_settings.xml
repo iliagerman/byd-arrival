@@ -81,6 +81,7 @@
             <EditText android:id="@+id/cooldown_minutes" style="@style/Field" android:layout_marginTop="4dp" android:inputType="number" android:maxLength="2" />
             <Button android:id="@+id/monitor_gps" style="@style/ButtonPrimary" android:text="@string/monitor_gps" />
             <Button android:id="@+id/monitor_stop" style="@style/ButtonText" android:text="@string/monitor_stop" />
+            <Button android:id="@+id/auto_guide" style="@style/ButtonText" android:text="@string/auto_guide" />
         </LinearLayout>
 
         <LinearLayout style="@style/Card">

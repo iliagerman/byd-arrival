@@ -34,11 +34,14 @@ final class Permissions {
         if(!batteryUnrestricted(activity))
             activity.startActivityForResult(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,Uri.parse("package:"+activity.getPackageName())),BATTERY);
     }
+    /** Android returns empty results when a prompt is interrupted, which counts as not granted. */
+    static boolean allGranted(int[] results) {
+        for(int result:results) if(result!=PackageManager.PERMISSION_GRANTED) return false;
+        return results.length>0;
+    }
     /** After a permission answer: carry on only if everything asked was granted, so a "Don't allow" is respected. */
     static void continueAfter(Activity activity,int code,int[] results) {
-        if(code==BLUETOOTH) return;
-        for(int result:results) if(result!=PackageManager.PERMISSION_GRANTED) return;
-        if(!complete(activity)) askNext(activity);
+        if(code!=BLUETOOTH && allGranted(results) && !complete(activity)) askNext(activity);
     }
     static void requestBluetooth(Activity activity) {
         activity.requestPermissions(new String[]{Manifest.permission.BLUETOOTH_SCAN,Manifest.permission.BLUETOOTH_CONNECT},BLUETOOTH);

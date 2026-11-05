@@ -34,6 +34,12 @@ final class AppRuntime {
         String saved=prefs(c).getString("climatePlan",null);
         return saved==null?ClimatePlan.defaults():ClimatePlan.parse(saved);
     }
+    static int fireMetres(Context c) { return prefs(c).getInt("fireMetres",AutoStartSettings.DEFAULT_START); }
+    static int rearmMetres(Context c) { return prefs(c).getInt("rearmMetres",AutoStartSettings.DEFAULT_REARM); }
+    static int cooldownMinutes(Context c) { return prefs(c).getInt("cooldownMinutes",AutoStartSettings.DEFAULT_MINUTES); }
+    static void saveAutoStart(Context c,AutoStartSettings values) {
+        prefs(c).edit().putInt("fireMetres",values.start).putInt("rearmMetres",values.rearm).putInt("cooldownMinutes",values.minutes).apply();
+    }
     static int engineMinutes(Context c) { return prefs(c).getInt("engineMinutes",30); }
     static int icon(String code) {
         switch(code) {

@@ -116,6 +116,18 @@ public class CoreTest {
         check(Regions.preferredCountry("", "").equals("GB"), "unknown phone country falls back to a listed one");
         try { Regions.host("evil.example.com/"); throw new AssertionError("must reject unknown server"); }
         catch (IllegalArgumentException expected) { check(true, "only listed servers are accepted"); }
+        AutoStartSettings values = new AutoStartSettings("", "", "");
+        check(values.start == 15 && values.rearm == 20 && values.minutes == 5, "blank values use the defaults: 15 m, 20 m, 5 min");
+        values = new AutoStartSettings("25", "60", "10");
+        check(values.start == 25 && values.rearm == 60 && values.minutes == 10, "sensible values are kept");
+        values = new AutoStartSettings("30", "20", "5");
+        check(values.start == 30 && values.rearm == 35, "re-arm is raised clearly beyond the start distance");
+        values = new AutoStartSettings("1", "2", "0");
+        check(values.start == 3 && values.rearm == 8 && values.minutes == 1, "values below the minimum are raised");
+        values = new AutoStartSettings("999", "999", "999");
+        check(values.start == 495 && values.rearm == 500 && values.minutes == 60, "values above the maximum are lowered");
+        values = new AutoStartSettings("abc", " 18 ", "-3");
+        check(values.start == 15 && values.rearm == 20 && values.minutes == 5, "unreadable values use the defaults");
         check(UpdateCheck.buildOf("v42") == 42, "release tag holds the build number");
         check(UpdateCheck.newerBuild("v42", 41) == 42, "a higher build on GitHub is an update");
         check(UpdateCheck.newerBuild("v42", 42) == 0, "the same build is not an update");
