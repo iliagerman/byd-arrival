@@ -32,7 +32,11 @@ public final class MainActivity extends Activity implements SharedPreferences.On
         start=findViewById(R.id.start);
         start.setOnClickListener(v->send("START"));
         grid=findViewById(R.id.grid);
-        if(state==null) firstRunChecks();
+        if(state==null) {
+            firstRunChecks();
+            Updates.schedule(this);
+            Updates.offerOnLaunch(this);
+        }
     }
     /** On launch: sign in if there are no credentials, pick a car if none is chosen, then ask for missing permissions. */
     private void firstRunChecks() {

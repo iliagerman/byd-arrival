@@ -103,6 +103,13 @@ public class CoreTest {
         check(!byWifi.observe(20, 5, true) && byWifi.armed(), "trusted Wi-Fi arms before the start distance");
         check(byWifi.observe(10, 5, true), "armed by Wi-Fi, the trigger fires when the phone gets close");
         check(Math.abs(ProximityGate.metres(32.0, 34.0, 32.0001, 34.0) - 11.12) < 0.05, "0.0001 degrees latitude is about 11 m");
+        check(UpdateCheck.buildOf("v42") == 42, "release tag holds the build number");
+        check(UpdateCheck.newerBuild("v42", 41) == 42, "a higher build on GitHub is an update");
+        check(UpdateCheck.newerBuild("v42", 42) == 0, "the same build is not an update");
+        check(UpdateCheck.newerBuild("v41", 42) == 0, "an older build on GitHub is not an update");
+        for (String bad : List.of("42", "v", "v1.2", "release-42", "v42-beta", ""))
+            try { UpdateCheck.buildOf(bad); throw new AssertionError("must reject tag: " + bad); }
+            catch (IllegalArgumentException expected) { check(true, "unexpected release tag is rejected"); }
         check(Crypto.md5("hello").equals("5D41402ABC4B2A76B9719D911017C592"), "MD5 reference");
         String key = Crypto.md5(Crypto.md5("test-password"));
         check(Crypto.decrypt(Crypto.encrypt("hello", key), key).equals("hello"), "inner AES roundtrip");

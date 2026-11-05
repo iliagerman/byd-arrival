@@ -64,6 +64,8 @@ public final class SettingsActivity extends Activity {
         click(R.id.add_widget,this::addWidget);
         click(R.id.grant,()-> { if(Permissions.complete(this)) toast("All permissions are granted."); else Permissions.askNext(this); });
         click(R.id.forget,this::confirmForget);
+        click(R.id.check_updates,()->Updates.checkNow(this));
+        ((TextView)findViewById(R.id.app_version)).setText(getString(R.string.app_version,BuildConfig.VERSION_NAME));
     }
     @Override protected void onResume() { super.onResume(); refresh(); }
     @Override protected void onPause() { stopScan(); super.onPause(); }

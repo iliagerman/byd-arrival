@@ -13,6 +13,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
     <application android:allowBackup="false" android:dataExtractionRules="@xml/no_backup" android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher" android:theme="@style/AppTheme"
@@ -24,6 +25,7 @@
             </intent-filter>
         </activity>
         <activity android:name=".SettingsActivity" android:exported="false" android:parentActivityName=".MainActivity" />
+        <service android:name=".UpdateJob" android:exported="false" android:permission="android.permission.BIND_JOB_SERVICE" />
         <service android:name=".CommandService" android:exported="false" android:foregroundServiceType="dataSync" />
         <service android:name=".MonitorService" android:exported="false" android:foregroundServiceType="location|connectedDevice" />
         <receiver android:name=".ArrivalWidget" android:exported="false">

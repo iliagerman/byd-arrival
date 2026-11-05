@@ -107,6 +107,8 @@
 
         <LinearLayout style="@style/Card">
             <TextView style="@style/CardTitle" android:text="@string/phone_title" />
+            <TextView android:id="@+id/app_version" style="@style/Body" />
+            <Button android:id="@+id/check_updates" style="@style/ButtonTonal" android:text="@string/check_updates" />
             <Button android:id="@+id/forget" style="@style/ButtonText" android:text="@string/forget" android:textColor="@color/danger" />
         </LinearLayout>
 
