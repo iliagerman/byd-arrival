@@ -6,6 +6,7 @@ on:
   push:
     branches: [main]
     paths-ignore: ['**.md']
+  workflow_dispatch: # lets a maintainer rebuild from the Actions tab
 
 # One build at a time, so an older build can never finish last and become the "latest" release.
 concurrency:
