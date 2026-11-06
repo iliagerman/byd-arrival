@@ -88,6 +88,14 @@ final class AppRuntime {
         }
         return b.build();
     }
+    /**
+     * Turns auto-start off on purpose. Only this clears "monitoring", so a restart after a reboot or update
+     * still happens after a start that failed (for example with no network yet).
+     */
+    static void stopMonitoring(Context c) {
+        prefs(c).edit().putBoolean("monitoring",false).apply();
+        c.stopService(new Intent(c,MonitorService.class));
+    }
     /** Updates the status shown in the app and widget, without a notification. */
     static void note(Context c,String message) {
         prefs(c).edit().putString("status",message).putLong("statusAt",System.currentTimeMillis()).apply();
@@ -166,7 +174,7 @@ final class AppRuntime {
             } catch(Exception error) {
                 prefs(c).edit().putString("lastResult","fail").apply();
                 clearSession();
-                if(automation) c.stopService(new Intent(c,MonitorService.class));
+                if(automation) stopMonitoring(c);
                 status(c,safeError(error)+(automation?" Automation stopped.":""));
             } finally {
                 if(wake.isHeld()) wake.release();

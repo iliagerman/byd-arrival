@@ -129,6 +129,7 @@ How it behaves:
 - **Inaccurate readings can't fire it.** Readings less accurate than the re-arm distance are ignored.
 - **A failed command stops monitoring,** with a message explaining why.
 - **It restarts by itself** after an app update, after the phone restarts, and if Android stops the app. The event line then says so, for example `Restarted after the phone restarted`.
+- **It keeps trying when it can't reach the car.** If BYD has no position for the car or the network isn't up yet (common right after a restart), it tries again after 1 minute, then less often, up to every 15 minutes. Only **Stop**, a failed car command, signing in again or forgetting credentials turn it off.
 - **It shows when readings stop.** If no location reading arrives for 10 minutes, the status says `No reading since 02:09:09` instead of the last distance.
 - **Restart monitoring after parking somewhere new.** The car's position is only read when monitoring starts.
 

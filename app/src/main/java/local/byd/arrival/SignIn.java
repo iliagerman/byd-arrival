@@ -56,7 +56,7 @@ final class SignIn {
         });
     }
     private static void signIn(Activity activity,AlertDialog dialog,View button,String user,String pass,String code,String country,String server,Runnable done) {
-        activity.stopService(new Intent(activity,MonitorService.class));
+        AppRuntime.stopMonitoring(activity);
         AppRuntime.IO.execute(()-> {
             try {
                 new Vault(activity).save(user,pass,code); AppRuntime.clearSession();

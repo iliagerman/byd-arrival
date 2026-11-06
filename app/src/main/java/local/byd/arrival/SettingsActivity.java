@@ -59,7 +59,7 @@ public final class SettingsActivity extends Activity {
         click(R.id.monitor_gps,()->enableMonitor("gps"));
         click(R.id.auto_guide,()->startActivityForResult(new Intent(this,WelcomeActivity.class),GUIDE));
         click(R.id.monitor_ble,()->enableMonitor("ble"));
-        click(R.id.monitor_stop,()-> { stopService(new Intent(this,MonitorService.class)); toast("Monitoring stopped."); });
+        click(R.id.monitor_stop,()-> { AppRuntime.stopMonitoring(this); toast("Monitoring stopped."); });
         click(R.id.add_widget,this::addWidget);
         click(R.id.grant,()-> { if(Permissions.complete(this)) toast("All permissions are granted."); else Permissions.askNext(this); });
         click(R.id.forget,this::confirmForget);
@@ -127,7 +127,7 @@ public final class SettingsActivity extends Activity {
         if(!found.containsKey(address)) {
             TextView row=(TextView)getLayoutInflater().inflate(R.layout.device_row,devices,false);
             row.setOnClickListener(v-> {
-                stopService(new Intent(this,MonitorService.class)); stopScan();
+                AppRuntime.stopMonitoring(this); stopScan();
                 AppRuntime.prefs(this).edit().putString("beacon",address).apply(); refresh();
             });
             devices.addView(row); found.put(address,row);
@@ -237,7 +237,7 @@ public final class SettingsActivity extends Activity {
             .setPositiveButton("Forget",(d,w)->forget()).setNegativeButton("Cancel",null).show();
     }
     private void forget() {
-        stopService(new Intent(this,MonitorService.class));
+        AppRuntime.stopMonitoring(this);
         AppRuntime.IO.execute(()-> {
             try {
                 new Vault(this).forget(); AppRuntime.clearSession();

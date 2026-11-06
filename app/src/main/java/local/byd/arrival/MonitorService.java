@@ -52,11 +52,11 @@ public final class MonitorService extends Service {
     };
     /** Sticky: if Android ends the app while monitoring, it restarts this service with no intent, in the mode last used. */
     @Override public int onStartCommand(Intent intent,int flags,int startId) {
-        if(intent!=null && "STOP".equals(intent.getAction())) { stopSelf(); return START_NOT_STICKY; }
+        if(intent!=null && "STOP".equals(intent.getAction())) { AppRuntime.stopMonitoring(this); return START_NOT_STICKY; }
         if(active!=null) return START_STICKY;
         if(intent==null) AppRuntime.proximityEvent(this,"Restarted after Android stopped the app");
         active=intent!=null?intent.getStringExtra("mode"):AppRuntime.prefs(this).getString("monitorMode","gps");
-        AppRuntime.prefs(this).edit().putString("monitorMode",active).apply();
+        AppRuntime.prefs(this).edit().putString("monitorMode",active).putBoolean("monitoring",true).apply();
         boolean gps="gps".equals(active);
         startForeground(11,AppRuntime.notification(this,"Monitoring the car. Tap Stop to disable.","monitor"),
             gps?ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION:ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE);
@@ -76,9 +76,17 @@ public final class MonitorService extends Service {
                 handler.post(()->beginGps(at));
             } catch(Exception error) {
                 AppRuntime.clearSession();
-                handler.post(()->stopWithStatus(AppRuntime.safeError(error)));
+                handler.post(()->retryLater(AppRuntime.safeError(error)));
             }
         });
+    }
+    private long retryMs=60000;
+    /** No car position yet (no network right after a reboot, BYD busy, no fix): try again after 1 minute, doubling up to 15. */
+    private void retryLater(String reason) {
+        String at=android.text.format.DateFormat.format("HH:mm",System.currentTimeMillis()+retryMs).toString();
+        AppRuntime.note(this,reason+" Trying again at "+at+".");
+        handler.postDelayed(this::startGps,retryMs);
+        retryMs=Math.min(retryMs*2,15*60000L);
     }
     private void beginGps(double[] car) {
         if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED) {
@@ -99,7 +107,6 @@ public final class MonitorService extends Service {
         locations.requestLocationUpdates(provider,request,getMainExecutor(),gpsListener);
         connectivity=getSystemService(ConnectivityManager.class);
         connectivity.registerNetworkCallback(new NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build(),wifiCallback);
-        AppRuntime.prefs(this).edit().putBoolean("monitoring",true).apply();
         AppRuntime.status(this,"Location monitoring on.");
     }
     /** Saves the armed state on every change, before any start, so a restart cannot repeat a start. */
@@ -158,7 +165,6 @@ public final class MonitorService extends Service {
         scanner.startScan(List.of(new ScanFilter.Builder().setDeviceAddress(address).build()),
             new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).setReportDelay(0).build(),callback);
         handler.post(tick);
-        AppRuntime.prefs(this).edit().putBoolean("monitoring",true).apply();
         AppRuntime.status(this,"Bluetooth monitoring started. Leave signal range for 60 seconds before approaching.");
     }
     private void stopWithStatus(String message) { AppRuntime.status(this,message); stopSelf(); }
@@ -173,7 +179,6 @@ public final class MonitorService extends Service {
         } catch(IllegalStateException ignored) {
             // Bluetooth can be disabled externally while the service is stopping.
         }
-        AppRuntime.prefs(this).edit().putBoolean("monitoring",false).apply();
         AppRuntime.setProximity(this,false,"Off");
         super.onDestroy();
     }
