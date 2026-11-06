@@ -143,6 +143,13 @@ public class CoreTest {
         check(AutoStartSettings.wifiSignal("-10") == -30, "a signal stronger than −30 dBm is lowered");
         check(AutoStartSettings.wifiSignal("-120") == -95, "a signal weaker than −95 dBm is raised");
         check(AutoStartSettings.wifiSignal("strong") == -70, "an unreadable Wi-Fi signal uses the default");
+        check(AutoStartSettings.intervalSeconds("") == 5, "blank check interval uses the default 5 s");
+        check(AutoStartSettings.intervalSeconds(" 12 ") == 12, "a sensible check interval is kept");
+        check(AutoStartSettings.intervalSeconds("0") == 1, "the check interval is at least 1 s");
+        check(AutoStartSettings.intervalSeconds("300") == 60, "the check interval is at most 60 s");
+        check(AutoStartSettings.intervalSeconds("often") == 5, "an unreadable check interval uses the default");
+        check(AutoStartSettings.beaconAbsentMillis(5) == 60000, "continuous scanning: out of range for 60 s means you left");
+        check(AutoStartSettings.beaconAbsentMillis(60) == 120000, "scanning every 60 s: out of range for two rounds means you left");
         check(UpdateCheck.buildOf("v42") == 42, "release tag holds the build number");
         check(UpdateCheck.newerBuild("v42", 41) == 42, "a higher build on GitHub is an update");
         check(UpdateCheck.newerBuild("v42", 42) == 0, "the same build is not an update");

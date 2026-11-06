@@ -141,18 +141,27 @@ public final class SettingsActivity extends Activity {
         if("ble".equals(mode) && !Permissions.bluetoothReady(this)) { toast("Tap Scan to allow nearby devices first."); return; }
         if("ble".equals(mode) && !beaconReady()) return;
         if("gps".equals(mode)) saveAutoStart();
+        saveInterval();
         startMonitor(mode);
     }
     private void loadAutoStart() {
         ((EditText)findViewById(R.id.fire_metres)).setText(String.valueOf(AppRuntime.fireMetres(this)));
         ((EditText)findViewById(R.id.rearm_metres)).setText(String.valueOf(AppRuntime.rearmMetres(this)));
         ((EditText)findViewById(R.id.cooldown_minutes)).setText(String.valueOf(AppRuntime.cooldownMinutes(this)));
+        ((EditText)findViewById(R.id.interval_seconds)).setText(String.valueOf(AppRuntime.intervalSeconds(this)));
     }
     /** Saves the auto-start values. Anything that doesn't work together is adjusted, and the fields show the result. */
     private void saveAutoStart() {
         AppRuntime.saveAutoStart(this,new AutoStartSettings(((EditText)findViewById(R.id.fire_metres)).getText().toString(),
             ((EditText)findViewById(R.id.rearm_metres)).getText().toString(),((EditText)findViewById(R.id.cooldown_minutes)).getText().toString()));
         loadAutoStart();
+    }
+    /** The check interval applies to GPS and Bluetooth monitoring alike. */
+    private void saveInterval() {
+        EditText field=findViewById(R.id.interval_seconds);
+        int seconds=AutoStartSettings.intervalSeconds(field.getText().toString());
+        AppRuntime.prefs(this).edit().putInt("intervalSeconds",seconds).apply();
+        field.setText(String.valueOf(seconds));
     }
     /**
      * Adds the Wi-Fi the phone is on now. Android hides the name from a direct lookup, so a short-lived
@@ -194,14 +203,19 @@ public final class SettingsActivity extends Activity {
     private void showWifi() {
         LinearLayout list=findViewById(R.id.wifi_list);
         list.removeAllViews();
-        for(String name:new TreeSet<>(AppRuntime.trustedWifi(this))) {
-            Button row=(Button)getLayoutInflater().inflate(R.layout.wifi_row,list,false);
-            row.setText(getString(R.string.wifi_remove,name));
-            row.setOnClickListener(v-> {
+        Set<String> saved=AppRuntime.trustedWifi(this);
+        findViewById(R.id.wifi_none).setVisibility(saved.isEmpty()?View.VISIBLE:View.GONE);
+        for(String name:new TreeSet<>(saved)) {
+            View row=getLayoutInflater().inflate(R.layout.wifi_row,list,false);
+            ((TextView)row.findViewById(R.id.wifi_name)).setText(name);
+            View delete=row.findViewById(R.id.wifi_delete);
+            delete.setContentDescription(getString(R.string.wifi_remove,name));
+            delete.setOnClickListener(v-> {
                 Set<String> names=AppRuntime.trustedWifi(this);
                 names.remove(name);
                 AppRuntime.setTrustedWifi(this,names);
                 showWifi();
+                toast("Removed "+name+".");
             });
             list.addView(row);
         }

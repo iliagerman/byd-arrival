@@ -81,6 +81,9 @@
             <EditText android:id="@+id/rearm_metres" style="@style/Field" android:layout_marginTop="4dp" android:inputType="number" android:maxLength="3" />
             <TextView style="@style/FieldLabel" android:text="@string/cooldown_minutes" />
             <EditText android:id="@+id/cooldown_minutes" style="@style/Field" android:layout_marginTop="4dp" android:inputType="number" android:maxLength="2" />
+            <TextView style="@style/FieldLabel" android:text="@string/interval_seconds" />
+            <EditText android:id="@+id/interval_seconds" style="@style/Field" android:layout_marginTop="4dp" android:inputType="number" android:maxLength="2" />
+            <TextView style="@style/Body" android:text="@string/interval_hint" android:textSize="13sp" />
             <Button android:id="@+id/monitor_gps" style="@style/ButtonPrimary" android:text="@string/monitor_gps" />
             <Button android:id="@+id/monitor_stop" style="@style/ButtonText" android:text="@string/monitor_stop" />
             <Button android:id="@+id/auto_guide" style="@style/ButtonText" android:text="@string/auto_guide" />
@@ -89,8 +92,9 @@
         <LinearLayout style="@style/Card">
             <TextView style="@style/CardTitle" android:text="@string/wifi_title" />
             <TextView style="@style/Body" android:text="@string/wifi_body" />
+            <TextView android:id="@+id/wifi_none" style="@style/Body" android:text="@string/wifi_none" />
             <LinearLayout android:id="@+id/wifi_list" android:layout_width="match_parent"
-                android:layout_height="wrap_content" android:orientation="vertical" />
+                android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="vertical" />
             <Button android:id="@+id/add_wifi" style="@style/ButtonTonal" android:text="@string/add_wifi" />
             <TextView style="@style/FieldLabel" android:text="@string/wifi_signal" />
             <EditText android:id="@+id/wifi_signal" style="@style/Field" android:layout_marginTop="4dp" android:inputType="numberSigned" android:maxLength="4" />

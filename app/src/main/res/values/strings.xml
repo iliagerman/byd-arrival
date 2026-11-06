@@ -27,10 +27,13 @@
     <string name="fire_metres">Start the car when within (metres)</string>
     <string name="rearm_metres">Re-arm after getting further than (metres)</string>
     <string name="cooldown_minutes">Minimum minutes between automatic starts (1–60)</string>
+    <string name="interval_seconds">Check every (seconds, 1–60)</string>
+    <string name="interval_hint">How often to measure your distance to the car, or to scan for the Bluetooth beacon. Shorter reacts sooner but uses more battery. Default 5. Applies when you start monitoring.</string>
     <string name="wifi_title">Arm when connected to Wi-Fi</string>
     <string name="wifi_body">While GPS monitoring is on, a strong signal from one of these networks arms the distance trigger, as if you had walked away. A weak signal, like at the car, is ignored. Nothing is sent to the car, and the car is never started while you are connected to one of these networks, however weak the signal. Connect to the network, then tap Add current Wi-Fi.</string>
     <string name="add_wifi">Add current Wi-Fi</string>
     <string name="wifi_remove">Remove %1$s</string>
+    <string name="wifi_none">No networks added yet.</string>
     <string name="wifi_signal">Strong signal from (dBm, −95 to −30)</string>
     <string name="wifi_signal_hint">Default −70. Tap Add current Wi-Fi in the house and again at the car: each shows the signal there. Pick a value between the two.</string>
     <string name="permissions_title">Permissions</string>

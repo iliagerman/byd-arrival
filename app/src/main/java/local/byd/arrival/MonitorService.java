@@ -106,7 +106,7 @@ public final class MonitorService extends Service {
         locations=getSystemService(LocationManager.class);
         // Fused combines GPS, Wi-Fi and cell, so fixes keep coming indoors; GPS alone often has none there.
         String provider=locations.hasProvider(LocationManager.FUSED_PROVIDER)?LocationManager.FUSED_PROVIDER:LocationManager.GPS_PROVIDER;
-        LocationRequest request=new LocationRequest.Builder(5000).setQuality(LocationRequest.QUALITY_HIGH_ACCURACY).build();
+        LocationRequest request=new LocationRequest.Builder(AppRuntime.intervalSeconds(this)*1000L).setQuality(LocationRequest.QUALITY_HIGH_ACCURACY).build();
         locations.requestLocationUpdates(provider,request,getMainExecutor(),gpsListener);
         connectivity=getSystemService(ConnectivityManager.class);
         connectivity.registerNetworkCallback(new NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build(),wifiCallback);
@@ -165,11 +165,29 @@ public final class MonitorService extends Service {
         if(adapter==null || !adapter.isEnabled()) throw new IllegalStateException("Bluetooth is off");
         scanner=adapter.getBluetoothLeScanner();
         started=SystemClock.elapsedRealtime();
-        gate=new ArrivalGate(AppRuntime.prefs(this).getInt("rssi",-65),60000);
-        scanner.startScan(List.of(new ScanFilter.Builder().setDeviceAddress(address).build()),
-            new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).setReportDelay(0).build(),callback);
+        int seconds=AppRuntime.intervalSeconds(this);
+        long absent=AutoStartSettings.beaconAbsentMillis(seconds);
+        gate=new ArrivalGate(AppRuntime.prefs(this).getInt("rssi",-65),absent);
+        filters=List.of(new ScanFilter.Builder().setDeviceAddress(address).build());
+        if(seconds<AutoStartSettings.SCAN_ROUNDS_FROM_SECONDS) startScan(); else scanRound(seconds*1000L);
         handler.post(tick);
-        AppRuntime.status(this,"Bluetooth monitoring started. Leave signal range for 60 seconds before approaching.");
+        AppRuntime.status(this,"Bluetooth monitoring started. Leave signal range for "+absent/1000+" seconds before approaching.");
+    }
+    private List<ScanFilter> filters;
+    /** Permission was checked in startBle; Android ends the app if it is revoked. */
+    @android.annotation.SuppressLint("MissingPermission")
+    private void startScan() {
+        scanner.startScan(filters,new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).setReportDelay(0).build(),callback);
+    }
+    /**
+     * Scans for 5 seconds every interval, enough for several sightings of the beacon. Rounds start at least
+     * 10 seconds apart, because Android blocks apps that start a scan more than 5 times in 30 seconds.
+     */
+    @android.annotation.SuppressLint("MissingPermission")
+    private void scanRound(long everyMs) {
+        startScan();
+        handler.postDelayed(()->scanner.stopScan(callback),5000);
+        handler.postDelayed(()->scanRound(everyMs),everyMs);
     }
     private void stopWithStatus(String message) { AppRuntime.status(this,message); stopSelf(); }
     /**
