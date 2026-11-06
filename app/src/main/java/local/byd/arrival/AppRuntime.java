@@ -19,6 +19,8 @@ final class AppRuntime {
     static void setCustoms(Context c,List<Actions.Custom> customs) { prefs(c).edit().putString("customActions",Actions.toJson(customs)).apply(); }
     /** What the proximity trigger runs. Default: the smart Start car. */
     static String arrivalAction(Context c) { return prefs(c).getString("arrivalAction","START"); }
+    /** What runs when you walk away after an auto-start. Empty (the default): nothing. */
+    static String leaveAction(Context c) { return prefs(c).getString("leaveAction",""); }
     /** Widget buttons, in order (up to ten). Older versions kept a separate main button; it becomes the first button. */
     static List<String> widgetTiles(Context c) {
         SharedPreferences prefs=prefs(c);

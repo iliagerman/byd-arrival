@@ -72,6 +72,9 @@
             <TextView style="@style/Body" android:text="@string/arrival_body" />
             <TextView style="@style/FieldLabel" android:text="@string/arrival_action" />
             <Spinner android:id="@+id/arrival_action" android:layout_width="match_parent" android:layout_height="48dp" android:layout_marginTop="4dp" />
+            <TextView style="@style/FieldLabel" android:text="@string/leave_action" />
+            <Spinner android:id="@+id/leave_action" android:layout_width="match_parent" android:layout_height="48dp" android:layout_marginTop="4dp" />
+            <TextView style="@style/Body" android:text="@string/leave_hint" />
             <TextView style="@style/FieldLabel" android:text="@string/fire_metres" />
             <EditText android:id="@+id/fire_metres" style="@style/Field" android:layout_marginTop="4dp" android:inputType="number" android:maxLength="3" />
             <TextView style="@style/FieldLabel" android:text="@string/rearm_metres" />

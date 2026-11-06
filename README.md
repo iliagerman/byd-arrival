@@ -101,7 +101,7 @@ Start car reads the cabin temperature (or the outside temperature if the car has
 
 ### Custom actions
 
-Settings → **Custom actions** → **New custom action**. Give it a name and tick the steps; they run in the order you tick them, and stop at the first failure. For example, "Off & Lock" could be Turn off, then Lock. A custom action can be a widget button or the auto-start action.
+Settings → **Custom actions** → **New custom action**. Give it a name and tick the steps; they run in the order you tick them, and stop at the first failure. For example, "Off & Lock" could be Turn off, then Lock. A custom action can be a widget button, the auto-start action or the walk-away action.
 
 ### Auto-start near the car
 
@@ -113,7 +113,8 @@ This unlocks the car and runs an action when your phone comes close to the parke
    - **Re-arm after getting further than:** default 20 m.
    - **Minimum minutes between automatic starts:** default 5.
 3. Tap **Start monitoring**. The app reads the car's position, then follows your phone's location.
-4. Walk away. The next time you come within the start distance, the car unlocks and the action runs.
+4. Optionally, choose **When you walk away, run**, for example Lock (default: Nothing).
+5. Walk away. The next time you come within the start distance, the car unlocks and the action runs.
 
 You can't save values that don't work together, because the app adjusts them for you and shows the result:
 
@@ -127,7 +128,8 @@ How it behaves:
 - **It fires once per arrival.** After firing, it waits until you've clearly left. The whole accuracy margin of a reading must be past the re-arm distance, so 30 m ±15 m doesn't count when the re-arm distance is 20 m.
 - **It must see you leave first.** It starts disarmed, so turning it on beside the car does nothing.
 - **Inaccurate readings can't fire it.** Readings less accurate than the re-arm distance are ignored.
-- **A failed command stops monitoring,** with a message explaining why.
+- **A failed command stops monitoring,** with a message explaining why. A failed walk-away action doesn't, because it can't repeat before your next arrival.
+- **The walk-away action runs once you're past the re-arm distance after an auto-start.** With GPS, the app first asks BYD where the car is. If the car moved more than the re-arm distance, you drove off, and the action is skipped. Arming by a trusted Wi-Fi never runs it. With a Bluetooth beacon, it runs once the beacon has been out of range for 60 seconds.
 - **It restarts by itself** after an app update, after the phone restarts, and if Android stops the app. The event line then says so, for example `Restarted after the phone restarted`.
 - **It keeps trying when it can't reach the car.** If BYD has no position for the car or the network isn't up yet (common right after a restart), it tries again after 1 minute, then less often, up to every 15 minutes. Only **Stop**, a failed car command, signing in again or forgetting credentials turn it off.
 - **It shows when readings stop.** If no location reading arrives for 10 minutes, the status says `No reading since 02:09:09` instead of the last distance.

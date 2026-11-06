@@ -26,16 +26,18 @@ final class ActionSettings {
             row.setOnClickListener(v->customMenu(custom));
             list.addView(row);
         }
-        spinner(R.id.arrival_action,"arrivalAction",AppRuntime.arrivalAction(activity),customs);
+        spinner(R.id.arrival_action,"arrivalAction",AppRuntime.arrivalAction(activity),customs,false);
+        spinner(R.id.leave_action,"leaveAction",AppRuntime.leaveAction(activity),customs,true);
         List<String> tiles=AppRuntime.widgetTiles(activity);
         ((TextView)activity.findViewById(R.id.widget_tiles)).setText(tiles.isEmpty()?"None":Actions.labels(tiles,customs).replace(" → ",", "));
         ArrivalWidget.updateAll(activity);
     }
-    /** A dropdown of every action that saves the choice under key as soon as it changes. */
-    private void spinner(int id,String key,String current,List<Actions.Custom> customs) {
+    /** A dropdown of every action, optionally led by Nothing (saved as ""), that saves the choice under key as soon as it changes. */
+    private void spinner(int id,String key,String current,List<Actions.Custom> customs,boolean optional) {
         Spinner spinner=activity.findViewById(id);
         List<String> codes=Actions.all(customs), labels=new ArrayList<>();
         for(String code:codes) labels.add(Actions.label(code,customs));
+        if(optional) { codes.add(0,""); labels.add(0,"Nothing"); }
         spinner.setOnItemSelectedListener(null);
         spinner.setAdapter(new ArrayAdapter<>(activity,android.R.layout.simple_spinner_dropdown_item,labels));
         spinner.setSelection(codes.indexOf(current),false);
@@ -66,7 +68,7 @@ final class ActionSettings {
             AppRuntime.setCustoms(activity,customs);
         });
     }
-    /** Removes the action and any widget button or auto-start setting that pointed at it. */
+    /** Removes the action and any widget button or auto-start or walk-away setting that pointed at it. */
     private void deleteCustom(Actions.Custom custom) {
         List<Actions.Custom> customs=new ArrayList<>(AppRuntime.customs(activity));
         customs.remove(custom);
@@ -74,6 +76,7 @@ final class ActionSettings {
         tiles.remove(custom.id);
         android.content.SharedPreferences.Editor edit=AppRuntime.prefs(activity).edit().putString("widgetTiles",String.join(",",tiles));
         if(AppRuntime.arrivalAction(activity).equals(custom.id)) edit.putString("arrivalAction","START");
+        if(AppRuntime.leaveAction(activity).equals(custom.id)) edit.remove("leaveAction");
         edit.apply();
         AppRuntime.setCustoms(activity,customs);
         refresh();

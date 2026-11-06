@@ -22,6 +22,8 @@
     <string name="arrival_title">Auto-start near the car</string>
     <string name="arrival_body">Unlocks and starts the car when your phone gets within the start distance. It can start again only after you get further than the re-arm distance and the minimum minutes have passed.</string>
     <string name="arrival_warning">Phone location can be off by several metres. Anyone holding your phone can trigger it.</string>
+    <string name="leave_action">When you walk away, run</string>
+    <string name="leave_hint">Runs once you get past the re-arm distance after an auto-start. It\'s skipped if the car moved, so driving off doesn\'t run it. Arming by trusted Wi-Fi doesn\'t run it either.</string>
     <string name="fire_metres">Start the car when within (metres)</string>
     <string name="rearm_metres">Re-arm after getting further than (metres)</string>
     <string name="cooldown_minutes">Minimum minutes between automatic starts (1–60)</string>

@@ -37,7 +37,10 @@ public final class MonitorService extends Service {
     private long started;
     private final Handler handler=new Handler(Looper.getMainLooper());
     private final Runnable tick=new Runnable() {
-        @Override public void run() { gate.tick(SystemClock.elapsedRealtime()-started); handler.postDelayed(this,1000); }
+        @Override public void run() {
+            if(gate.tick(SystemClock.elapsedRealtime()-started)) leave(AppRuntime.leaveAction(MonitorService.this));
+            handler.postDelayed(this,1000);
+        }
     };
     private final ScanCallback callback=new ScanCallback() {
         @Override public void onScanResult(int type,ScanResult result) {
@@ -119,6 +122,7 @@ public final class MonitorService extends Service {
             AppRuntime.prefs(this).edit().putBoolean("gateArmed",proximity.armed()).commit();
             AppRuntime.proximityEvent(this,fire?"Triggered at "+Math.round(metres)+" m"
                 :"Armed by GPS: "+Math.round(metres)+" m ±"+Math.round(fix.getAccuracy())+" m");
+            if(!fire) walkedAway();
         }
         showProximity(Math.round(metres)+" m");
         if(fire) arrival();
@@ -168,6 +172,30 @@ public final class MonitorService extends Service {
         AppRuntime.status(this,"Bluetooth monitoring started. Leave signal range for 60 seconds before approaching.");
     }
     private void stopWithStatus(String message) { AppRuntime.status(this,message); stopSelf(); }
+    /**
+     * The GPS trigger re-armed: you got past the re-arm distance. The car's position is read only when monitoring
+     * starts, so driving off does the same. The walk-away action runs only if the car is still where it was.
+     */
+    private void walkedAway() {
+        String action=AppRuntime.leaveAction(this);
+        if(action.isEmpty()) return;
+        AppRuntime.IO.execute(()-> {
+            try {
+                double[] car=AppRuntime.api(this).location(AppRuntime.prefs(this).getString("vin",""));
+                long moved=Math.round(ProximityGate.metres(car[0],car[1],carLatitude,carLongitude));
+                if(moved>rearmMetres) AppRuntime.note(this,"Walk-away action skipped: the car moved "+moved+" m, so you drove off.");
+                else leave(action);
+            } catch(Exception error) {
+                AppRuntime.clearSession();
+                AppRuntime.note(this,"Walk-away action skipped: "+AppRuntime.safeError(error));
+            }
+        });
+    }
+    /** A failure here doesn't stop monitoring: the trigger is armed, so it can't repeat before your next arrival. */
+    private void leave(String action) {
+        if(action.isEmpty()) return;
+        AppRuntime.execute(this,List.of(action),false,()->{});
+    }
     private void arrival() { AppRuntime.execute(this,Actions.arrival(AppRuntime.arrivalAction(this),AppRuntime.customs(this)),true,()->{}); }
     @Override public void onDestroy() {
         handler.removeCallbacksAndMessages(null);

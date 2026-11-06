@@ -21,12 +21,14 @@ public class CoreTest {
         ArrivalGate gate = new ArrivalGate(-65, 60000);
         check(!gate.observe(0, -40), "no arrival when enabled beside car");
         check(!gate.observe(1000, -40), "initial strong signal suppressed");
-        gate.tick(62000);
+        check(!gate.tick(62000), "arming before any arrival is not a walk-away");
         check(!gate.observe(63000, -60), "first sample not enough");
         check(!gate.observe(64000, -60), "second sample not enough");
         check(gate.observe(65000, -60), "third stable sample fires");
         check(!gate.observe(66000, -40), "no repeat while nearby");
-        gate.tick(127000);
+        check(!gate.tick(100000), "still near the car: no walk-away");
+        check(gate.tick(127000), "out of range after an arrival is a walk-away");
+        check(!gate.tick(128000), "walk-away reported once");
         check(!gate.observe(128000, -60), "rearmed after absence");
         check(!gate.observe(129000, -85), "weak signal resets near samples");
         check(!gate.observe(130000, -60), "need consecutive near samples");
