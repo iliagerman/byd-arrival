@@ -37,6 +37,7 @@
     <string name="start_title">Start car</string>
     <string name="start_body">Start car reads the cabin temperature (outside, if the car has no cabin reading) and starts the A/C at the matching level.</string>
     <string name="engine_minutes">Engine-on time</string>
+    <string name="freezing_below">Freezing below (°C)</string>
     <string name="cold_below">Cold below (°C)</string>
     <string name="warm_from">Warm from (°C)</string>
     <string name="hot_above">Hot above (°C)</string>

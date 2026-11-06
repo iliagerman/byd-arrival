@@ -34,6 +34,8 @@
             <TextView style="@style/Body" android:text="@string/start_body" />
             <TextView style="@style/FieldLabel" android:text="@string/engine_minutes" />
             <Spinner android:id="@+id/engine_minutes" android:layout_width="match_parent" android:layout_height="48dp" android:layout_marginTop="4dp" />
+            <TextView style="@style/FieldLabel" android:text="@string/freezing_below" />
+            <EditText android:id="@+id/freezing_below" style="@style/Field" android:layout_marginTop="4dp" android:inputType="number" android:maxLength="2" />
             <TextView style="@style/FieldLabel" android:text="@string/cold_below" />
             <EditText android:id="@+id/cold_below" style="@style/Field" android:layout_marginTop="4dp" android:inputType="number" android:maxLength="2" />
             <TextView style="@style/FieldLabel" android:text="@string/warm_from" />

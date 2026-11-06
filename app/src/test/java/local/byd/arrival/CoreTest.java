@@ -66,12 +66,14 @@ public class CoreTest {
         for (String action : Actions.BUILT_IN.keySet())
             check(action.equals("START") || action.startsWith("SEAT_") || BydApi.COMMANDS.contains(action), "built-in action is an allowed command: " + action);
         ClimatePlan plan = ClimatePlan.defaults();
-        check(plan.choose(21) == plan.cold && plan.cold.driverSeat && plan.cold.temperature == 26, "below 22 °C: warm A/C and driver seat heat");
-        check(plan.choose(22) == plan.mild && plan.mild.temperature == 20 && plan.mild.fan == 3, "22–24 °C: 20 °C, fan 3");
+        check(plan.choose(16) == plan.freezing && plan.freezing.driverSeat && plan.freezing.temperature == 26, "below 17 °C: warm A/C and driver seat heat");
+        check(plan.choose(17) == plan.cold && !plan.cold.driverSeat && plan.cold.temperature == 26, "17–20 °C: warm A/C, no seat heat");
+        check(plan.choose(20) == plan.mild && plan.mild.temperature == 20 && plan.mild.fan == 3, "20–24 °C: 20 °C, fan 3");
         check(plan.choose(24) == plan.warm && plan.choose(27) == plan.warm && plan.warm.temperature == 18 && plan.warm.fan == 5, "24–27 °C: 18 °C, fan 5");
         check(plan.choose(28) == plan.hot && plan.hot.temperature == 17 && plan.hot.fan == 7, "above 27 °C: full cold");
+        check(ClimatePlan.parse("{\"coldBelow\":22,\"warmFrom\":24,\"hotAbove\":27,\"levels\":[]}").freezingBelow == 17, "old four-level settings switch to the new defaults");
         check(ClimatePlan.parse(plan.toJson()).hot.fan == 7, "start settings survive saving");
-        try { new ClimatePlan(25, 24, 27, plan.cold, plan.mild, plan.warm, plan.hot); throw new AssertionError("bands must go up"); }
+        try { new ClimatePlan(17, 25, 24, 27, plan.freezing, plan.cold, plan.mild, plan.warm, plan.hot); throw new AssertionError("bands must go up"); }
         catch (IllegalArgumentException expected) { check(true, "bands out of order are rejected"); }
         java.util.Map<String, Object> air = BydApi.climateParams(21, 17, 5, 30);
         check(air.get("mainSettingTemp").equals(5) && air.get("timeSpan").equals(5) && air.get("windLevel").equals(5), "21 °C on a 17–33 car is scale 5, 30 min, fan 5");

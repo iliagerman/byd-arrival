@@ -89,8 +89,9 @@ Start car reads the cabin temperature (or the outside temperature if the car has
 
 | Level | Default range | A/C | Fan | Seat heat |
 |---|---|---|---|---|
-| Cold | below 22 °C | 26 °C | 3 | driver |
-| Mild | 22–24 °C | 20 °C | 3 | off |
+| Freezing | below 17 °C | 26 °C | 3 | driver |
+| Cold | 17–20 °C | 26 °C | 3 | off |
+| Mild | 20–24 °C | 20 °C | 3 | off |
 | Warm | 24–27 °C | 18 °C | 5 | off |
 | Hot | above 27 °C | 17 °C | 7 | off |
 
