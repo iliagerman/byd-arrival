@@ -5,6 +5,7 @@ import android.appwidget.*;
 import android.content.*;
 import android.view.View;
 import android.widget.RemoteViews;
+import java.util.Arrays;
 import java.util.List;
 
 /** Home-screen widget: one-tap actions using the stored PIN; no unlock or password prompt. */
@@ -50,7 +51,9 @@ public final class ArrivalWidget extends AppWidgetProvider {
                 views.setImageViewResource(ICONS[i],AppRuntime.icon(code));
                 views.setTextViewText(LABELS[i],Actions.label(code,customs));
                 views.setOnClickPendingIntent(TILES[i],action(context,31+i,code));
-                badge(views,BADGES[i],code.equals(prefs.getString("lastAction",""))?prefs.getString("lastResult",""):"");
+                // Auto-start runs several actions (Unlock, then Start car); each of their buttons shows the result.
+                boolean last=Arrays.asList(prefs.getString("lastAction","").split(",")).contains(code);
+                badge(views,BADGES[i],last?prefs.getString("lastResult",""):"");
             }
             views.setViewVisibility(R.id.w_row2,tiles.size()>5?View.VISIBLE:View.GONE);
             manager.updateAppWidget(id,views);

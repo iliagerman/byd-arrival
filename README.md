@@ -105,15 +105,15 @@ Settings → **Custom actions** → **New custom action**. Give it a name and ti
 
 ### Auto-start near the car
 
-This runs an action when your phone comes close to the parked car. It's off until you start it. The walkthrough after your first login covers the setup, or you can do it yourself under Settings → **AUTOMATION**:
+This unlocks the car and runs an action when your phone comes close to the parked car. It's off until you start it. The walkthrough after your first login covers the setup, or you can do it yourself under Settings → **AUTOMATION**:
 
-1. Choose what **Auto-start runs** (default: Start car).
+1. Choose what **After unlocking, auto-start runs** (default: Start car). Auto-start always unlocks the doors first, so you can get in even if that action fails. If your custom action already includes Unlock, it runs in your order instead.
 2. Set the distances and timing:
    - **Start the car when within:** default 15 m.
    - **Re-arm after getting further than:** default 20 m.
    - **Minimum minutes between automatic starts:** default 5.
 3. Tap **Start monitoring**. The app reads the car's position, then follows your phone's location.
-4. Walk away. The next time you come within the start distance, the action runs on your car.
+4. Walk away. The next time you come within the start distance, the car unlocks and the action runs.
 
 You can't save values that don't work together, because the app adjusts them for you and shows the result:
 
@@ -168,7 +168,7 @@ Tapping either one downloads the APK in your browser. Open the file to install i
 
 - **Your credentials stay on the phone, encrypted.** The email, password and PIN are encrypted with a key held in Android Keystore, and are excluded from Android backups.
 - **They can be used while the phone is locked.** Auto-start needs this. It also means anyone who can reach your widget can control your car without entering a PIN. Keep a screen lock on your phone.
-- **Auto-start can act without you.** Anyone carrying your unlocked or locked phone near the car can trigger it, and the action you chose may unlock the doors. GPS and Bluetooth signals can be spoofed.
+- **Auto-start can act without you.** Anyone carrying your unlocked or locked phone near the car can trigger it, and it unlocks the doors. GPS and Bluetooth signals can be spoofed.
 - **The network traffic is limited.** The app connects only to BYD's server for your region and to GitHub (for the version check and downloads). There are no analytics or ads, and your location is only used on the phone to work out the distance.
 - **To erase your data,** use Settings → **Forget credentials**, or uninstall the app.
 

@@ -98,6 +98,14 @@ public final class Actions {
         }
         return steps;
     }
+    /**
+     * What auto-start sends: Unlock first, so you can get in even if the chosen action then fails,
+     * followed by the chosen action. An action that already unlocks keeps its own order.
+     */
+    public static List<String> arrival(String action, List<Custom> customs) {
+        if (expand(List.of(action), customs).contains("OPENDOOR")) return List.of(action);
+        return List.of("OPENDOOR", action);
+    }
     public static String progress(String step) {
         switch (step) {
             case "OPENDOOR": return "Unlocking…";

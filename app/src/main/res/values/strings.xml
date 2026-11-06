@@ -20,7 +20,7 @@
     <string name="change_car">Change car</string>
     <string name="temperature">A/C on button temperature (°C)</string>
     <string name="arrival_title">Auto-start near the car</string>
-    <string name="arrival_body">Starts the car when your phone gets within the start distance. It can start again only after you get further than the re-arm distance and the minimum minutes have passed.</string>
+    <string name="arrival_body">Unlocks and starts the car when your phone gets within the start distance. It can start again only after you get further than the re-arm distance and the minimum minutes have passed.</string>
     <string name="arrival_warning">Phone location can be off by several metres. Anyone holding your phone can trigger it.</string>
     <string name="fire_metres">Start the car when within (metres)</string>
     <string name="rearm_metres">Re-arm after getting further than (metres)</string>
@@ -54,7 +54,7 @@
     <string name="widget_title">Widget</string>
     <string name="widget_tiles">Buttons (up to 10, 5 per row)</string>
     <string name="choose_tiles">Choose buttons</string>
-    <string name="arrival_action">Auto-start runs</string>
+    <string name="arrival_action">After unlocking, auto-start runs</string>
     <string name="section_setup">SET UP</string>
     <string name="section_auto">AUTOMATION</string>
     <string name="section_more">MORE</string>
@@ -74,7 +74,7 @@
     <string name="welcome_how_title">Auto-start near your car</string>
     <string name="welcome_how_body">BYD Arrival can start your car as you walk up to it, using your phone\'s location and the car\'s parked position.</string>
     <string name="welcome_up_title">Walk up</string>
-    <string name="welcome_up_body">When you come within the start distance, the app runs your auto-start action. By default that\'s Start car.</string>
+    <string name="welcome_up_body">When you come within the start distance, the app unlocks the car, then runs your auto-start action. By default that\'s Start car.</string>
     <string name="welcome_away_title">Walk away</string>
     <string name="welcome_away_body">Once you\'re past the re-arm distance, it\'s ready for your next return. It can\'t fire again until then.</string>
     <string name="welcome_wifi_title">Home and office Wi-Fi</string>
@@ -86,7 +86,7 @@
     <string name="welcome_minutes_hint">Stops it starting again if you walk past the car soon after.</string>
     <string name="welcome_ready_title">Ready to turn on</string>
     <string name="welcome_summary">Starts within %1$d m, re-arms beyond %2$d m, and starts at most once every %3$d min.</string>
-    <string name="welcome_ready_body">Your car will start for real when you walk up to it. It has to see you walk away first, so turning it on beside the car does nothing. To turn it off, tap Stop in its notification.</string>
+    <string name="welcome_ready_body">Your car will unlock and start for real when you walk up to it. It has to see you walk away first, so turning it on beside the car does nothing. To turn it off, tap Stop in its notification.</string>
     <string name="welcome_location_body">Android will ask for location access. Choose Allow all the time so it works with the screen off.</string>
     <string name="welcome_location_needed">Auto-start needs location access. You can start it later in Settings.</string>
     <string name="phone_title">Phone</string>

@@ -58,6 +58,10 @@ public class CoreTest {
         check(Actions.expand(List.of("C2"), customs).equals(List.of("OPENDOOR", "START", "SEAT_DRIVER")), "custom action expands to its steps in order");
         check(Actions.expand(List.of("START", "OPENAIR"), customs).equals(List.of("START")), "only the first A/C start runs");
         check(Actions.expand(List.of("CLOSEAIR"), customs).equals(List.of("CLOSEAIR")), "turn off sends A/C off only");
+        check(Actions.arrival("START", customs).equals(List.of("OPENDOOR", "START")), "auto-start unlocks first, then starts");
+        check(Actions.arrival("C1", customs).equals(List.of("OPENDOOR", "C1")), "auto-start unlocks before a custom action");
+        check(Actions.arrival("C2", customs).equals(List.of("C2")), "a custom action that unlocks keeps its own order");
+        check(Actions.arrival("OPENDOOR", customs).equals(List.of("OPENDOOR")), "auto-start set to Unlock unlocks once");
         check(Actions.parse(Actions.toJson(customs)).get(1).steps.equals(List.of("OPENDOOR", "START", "SEAT_DRIVER")), "custom actions survive saving");
         check(Actions.nextId(customs).equals("C3"), "new custom action gets a fresh id");
         check(Actions.labels(List.of("C1", "FINDCAR"), customs).equals("Leave → Find car"), "labels for built-in and custom");
