@@ -19,8 +19,8 @@ final class AppRuntime {
     static void setCustoms(Context c,List<Actions.Custom> customs) { prefs(c).edit().putString("customActions",Actions.toJson(customs)).apply(); }
     /** What the proximity trigger runs. Default: the smart Start car. */
     static String arrivalAction(Context c) { return prefs(c).getString("arrivalAction","START"); }
-    /** What runs when you walk away after an auto-start. Empty (the default): nothing. */
-    static String leaveAction(Context c) { return prefs(c).getString("leaveAction",""); }
+    /** What runs when you walk away after an auto-start. Default: Close & lock. Empty: nothing. */
+    static String leaveAction(Context c) { return prefs(c).getString("leaveAction","SECURE"); }
     /** Widget buttons, in order (up to ten). Older versions kept a separate main button; it becomes the first button. */
     static List<String> widgetTiles(Context c) {
         SharedPreferences prefs=prefs(c);
@@ -51,6 +51,7 @@ final class AppRuntime {
             case "CLOSEAIR": return R.drawable.ic_power_off;
             case "OPENDOOR": return R.drawable.ic_lock_open;
             case "LOCKDOOR": return R.drawable.ic_lock;
+            case "SECURE": return R.drawable.ic_secure;
             case "OPENTRUNK": case "CLOSETRUNK": return R.drawable.ic_trunk;
             case "OPENAIR": return R.drawable.ic_ac;
             case "SEAT_DRIVER": case "SEAT_PASSENGER": return R.drawable.ic_seat;
@@ -188,6 +189,7 @@ final class AppRuntime {
     private static void runStep(Context c,BydApi client,String vin,String step,List<String> notes) throws Exception {
         switch(step) {
             case "START": smartStart(c,client,vin,notes); return;
+            case "SECURE": closeAndLock(c,client,vin); return;
             case "OPENAIR": {
                 int temperature=prefs(c).getInt("temperature",21);
                 JSONObject climate=client.climate(vin);
@@ -223,6 +225,15 @@ final class AppRuntime {
             seatHeat(c,client,vin,climate,level.driverSeat,level.passengerSeat);
             notes.add("seat heat");
         }
+    }
+    /** Sends every Close & lock step even if one fails, so a rejected A/C off or tailgate close can't leave the car unlocked. */
+    private static void closeAndLock(Context c,BydApi client,String vin) throws Exception {
+        Map<String,Exception> failed=Routine.runAll(Actions.CLOSE_AND_LOCK,step-> { status(c,Actions.progress(step)); client.command(vin,step,null); });
+        if(failed.isEmpty()) return;
+        List<String> lines=new ArrayList<>();
+        failed.forEach((step,error)->lines.add(Actions.BUILT_IN.get(step)+": "+safeError(error)));
+        boolean others=failed.size()<Actions.CLOSE_AND_LOCK.size();
+        throw new IOException("Command failed in Close & lock. "+String.join(" ",lines)+(others?" The other steps were confirmed.":""));
     }
     /** The car reports -129 °C when it has no reading. */
     private static final int NO_READING=-129;

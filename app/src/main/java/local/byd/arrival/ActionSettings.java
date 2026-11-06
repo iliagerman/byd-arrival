@@ -76,7 +76,7 @@ final class ActionSettings {
         tiles.remove(custom.id);
         android.content.SharedPreferences.Editor edit=AppRuntime.prefs(activity).edit().putString("widgetTiles",String.join(",",tiles));
         if(AppRuntime.arrivalAction(activity).equals(custom.id)) edit.putString("arrivalAction","START");
-        if(AppRuntime.leaveAction(activity).equals(custom.id)) edit.remove("leaveAction");
+        if(AppRuntime.leaveAction(activity).equals(custom.id)) edit.putString("leaveAction","SECURE");
         edit.apply();
         AppRuntime.setCustoms(activity,customs);
         refresh();

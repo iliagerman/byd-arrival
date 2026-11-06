@@ -70,7 +70,16 @@ public class CoreTest {
         try { new Actions.Custom("C9", "Bad", List.of("C1")); throw new AssertionError("custom inside custom must fail"); }
         catch (IllegalArgumentException expected) { check(true, "custom actions hold only built-in steps"); }
         for (String action : Actions.BUILT_IN.keySet())
-            check(action.equals("START") || action.startsWith("SEAT_") || BydApi.COMMANDS.contains(action), "built-in action is an allowed command: " + action);
+            check(action.equals("START") || action.equals("SECURE") || action.startsWith("SEAT_") || BydApi.COMMANDS.contains(action), "built-in action is an allowed command: " + action);
+        check(Actions.CLOSE_AND_LOCK.equals(List.of("CLOSEAIR", "CLOSEWINDOW", "CLOSETRUNK", "LOCKDOOR")), "close & lock: off, windows, tailgate, then lock");
+        for (String step : Actions.CLOSE_AND_LOCK) check(BydApi.COMMANDS.contains(step), "close & lock step is an allowed command: " + step);
+        List<String> sent = new ArrayList<>();
+        Map<String, Exception> failed = Routine.runAll(List.of("CLOSEAIR", "CLOSEWINDOW", "LOCKDOOR"), command -> {
+            sent.add(command);
+            if (command.equals("CLOSEAIR")) throw new Exception("rejected");
+        });
+        check(sent.equals(List.of("CLOSEAIR", "CLOSEWINDOW", "LOCKDOOR")), "run-all keeps going after a failure, so the car still locks");
+        check(failed.keySet().equals(Set.of("CLOSEAIR")), "run-all reports only the failed step");
         ClimatePlan plan = ClimatePlan.defaults();
         check(plan.choose(16) == plan.freezing && plan.freezing.driverSeat && plan.freezing.temperature == 26, "below 17 °C: warm A/C and driver seat heat");
         check(plan.choose(17) == plan.cold && !plan.cold.driverSeat && plan.cold.temperature == 26, "17–20 °C: warm A/C, no seat heat");

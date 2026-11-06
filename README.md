@@ -22,6 +22,7 @@ You need:
 | **Start car** | Smart climate start, described [below](#start-car). BYD has no remote engine-start command, so starting the A/C is what powers the car on. |
 | **Turn off** | A/C off, and nothing else. On the Atto 3 this also shuts the car down. |
 | **Unlock** / **Lock** | Unlocks or locks the doors. |
+| **Close & lock** | Turns the car off (A/C off), closes the windows and the tailgate, then locks. Every step is sent even if one fails, so a failure can't leave the car unlocked; the result lists what failed. |
 | **Open trunk** / **Close trunk** | Opens or closes the trunk. |
 | **A/C on** | Starts the A/C at one fixed temperature that you choose. |
 | **Driver seat heat** / **Passenger seat heat** | Turns that seat's heating on. |
@@ -114,7 +115,7 @@ This unlocks the car and runs an action when your phone comes close to the parke
    - **Minimum minutes between automatic starts:** default 5.
    - **Check every:** default 5 seconds. How often the app measures your distance, or scans for the Bluetooth beacon. Shorter reacts sooner but uses more battery. Android can deliver location readings less often than asked, especially indoors.
 3. Tap **Start monitoring**. The app reads the car's position, then follows your phone's location.
-4. Optionally, choose **When you walk away, run**, for example Lock (default: Nothing).
+4. Choose **When you walk away, run** (default: Close & lock), or Nothing to turn it off.
 5. Walk away. The next time you come within the start distance, the car unlocks and the action runs.
 
 You can't save values that don't work together, because the app adjusts them for you and shows the result:

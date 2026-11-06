@@ -5,13 +5,16 @@ import java.util.*;
 
 /** Android-free action model: built-in car actions, user-made custom actions, and how they expand into steps. */
 public final class Actions {
-    /** Built-in actions: code to label, in display order. START is the smart climate start (see ClimatePlan). */
+    /** Close & lock, in order: turn the car off (A/C off), close the windows and the tailgate, then lock. */
+    public static final List<String> CLOSE_AND_LOCK = List.of("CLOSEAIR", "CLOSEWINDOW", "CLOSETRUNK", "LOCKDOOR");
+    /** Built-in actions: code to label, in display order. START is the smart climate start (see ClimatePlan). SECURE is Close & lock. */
     public static final LinkedHashMap<String,String> BUILT_IN=new LinkedHashMap<>();
     static {
         BUILT_IN.put("START","Start car");
         BUILT_IN.put("CLOSEAIR","Turn off");
         BUILT_IN.put("OPENDOOR","Unlock");
         BUILT_IN.put("LOCKDOOR","Lock");
+        BUILT_IN.put("SECURE","Close & lock");
         BUILT_IN.put("OPENTRUNK","Open trunk");
         BUILT_IN.put("CLOSETRUNK","Close trunk");
         BUILT_IN.put("OPENAIR","A/C on");
