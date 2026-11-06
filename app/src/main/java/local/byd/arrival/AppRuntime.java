@@ -102,6 +102,7 @@ final class AppRuntime {
     }
     /** Updates the status shown in the app and widget, without a notification. */
     static void note(Context c,String message) {
+        log(c,"status: "+message);
         prefs(c).edit().putString("status",message).putLong("statusAt",System.currentTimeMillis()).apply();
         ArrivalWidget.updateAll(c);
     }
@@ -113,15 +114,28 @@ final class AppRuntime {
     }
     static Set<String> trustedWifi(Context c) { return new HashSet<>(prefs(c).getStringSet("trustedWifi",Set.of())); }
     static void setTrustedWifi(Context c,Set<String> names) { prefs(c).edit().putStringSet("trustedWifi",new HashSet<>(names)).apply(); }
-    /** Proximity indicator for the app and widget, stamped with the update time. */
-    static void setProximity(Context c,boolean armed,String distance) {
-        prefs(c).edit().putBoolean("proximityArmed",armed).putString("proximityDistance",distance)
-            .putLong("proximityAt",System.currentTimeMillis()).apply();
+    /** Proximity indicator for the app and widget, stamped with the time of the reading it shows (at). */
+    static void setProximity(Context c,boolean armed,String distance,long at) {
+        prefs(c).edit().putBoolean("proximityArmed",armed).putString("proximityDistance",distance).putLong("proximityAt",at).apply();
         ArrivalWidget.updateAll(c);
     }
     /** Last arm, trigger or ignored-Wi-Fi event with its time, shown in the app so you can see why the state changed. */
     static void proximityEvent(Context c,String text) {
         prefs(c).edit().putString("proximityEvent",text+" · "+android.text.format.DateFormat.format("HH:mm:ss",System.currentTimeMillis())).apply();
+        log(c,"event: "+text);
+    }
+    /**
+     * Rolling log of location readings, events and statuses, without coordinates. Readable over ADB at
+     * /sdcard/Android/data/local.byd.arrival/files/readings.log; the previous half MB is kept in readings.old.log.
+     */
+    static void log(Context c,String line) {
+        File dir=c.getExternalFilesDir(null), file=new File(dir,"readings.log");
+        if(file.length()>512*1024 && !file.renameTo(new File(dir,"readings.old.log"))) android.util.Log.w("byd-arrival","Log rotation failed");
+        try(FileWriter out=new FileWriter(file,true)) {
+            out.write(android.text.format.DateFormat.format("MM-dd HH:mm:ss",System.currentTimeMillis())+" "+line+"\n");
+        } catch(IOException error) {
+            android.util.Log.w("byd-arrival","Log write failed",error);
+        }
     }
     /**
      * Shown next to the icon: armed or not, distance to the car and time of the last reading. Monitoring stopped: "Off".

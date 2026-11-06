@@ -19,7 +19,7 @@ public final class ArrivalWidget extends AppWidgetProvider {
                 if(Intent.ACTION_BOOT_COMPLETED.equals(action)) AppRuntime.proximityEvent(context,"Restarted after the phone restarted");
                 context.startForegroundService(new Intent(context,MonitorService.class).putExtra("mode",prefs.getString("monitorMode","gps")));
             }
-            else AppRuntime.setProximity(context,false,"Off");
+            else AppRuntime.setProximity(context,false,"Off",System.currentTimeMillis());
             return;
         }
         super.onReceive(context,intent);

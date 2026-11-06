@@ -19,11 +19,12 @@ public final class MonitorService extends Service {
     private double carLatitude, carLongitude;
     private ProximityGate proximity;
     private LocationManager locations;
-    private LocationListener gpsListener;
+    private LocationListener fusedListener, satelliteListener;
     private ConnectivityManager connectivity;
     /** Connected Wi-Fi name, null when none. Only touched on the main thread. */
     private String currentWifi;
     private String lastDistance="No fix";
+    private long lastDistanceAt;
     private final ConnectivityManager.NetworkCallback wifiCallback=new ConnectivityManager.NetworkCallback(ConnectivityManager.NetworkCallback.FLAG_INCLUDE_LOCATION_INFO) {
         @Override public void onCapabilitiesChanged(Network network,NetworkCapabilities caps) {
             String name=AppRuntime.wifiName(caps);
@@ -102,24 +103,34 @@ public final class MonitorService extends Service {
         android.content.SharedPreferences prefs=AppRuntime.prefs(this);
         fireMetres=AppRuntime.fireMetres(this); rearmMetres=AppRuntime.rearmMetres(this);
         proximity=new ProximityGate(fireMetres,rearmMetres,prefs.getBoolean("gateArmed",false));
-        showProximity("No fix");
-        gpsListener=new LocationListener() {
-            @Override public void onLocationChanged(Location fix) { onFix(fix); }
-        };
+        showProximity("No fix",System.currentTimeMillis());
         locations=getSystemService(LocationManager.class);
-        // Fused combines GPS, Wi-Fi and cell, so fixes keep coming indoors; GPS alone often has none there.
-        String provider=locations.hasProvider(LocationManager.FUSED_PROVIDER)?LocationManager.FUSED_PROVIDER:LocationManager.GPS_PROVIDER;
         LocationRequest request=new LocationRequest.Builder(AppRuntime.intervalSeconds(this)*1000L).setQuality(LocationRequest.QUALITY_HIGH_ACCURACY).build();
-        locations.requestLocationUpdates(provider,request,getMainExecutor(),gpsListener);
+        // Fused adds Wi-Fi and cell positions, so readings keep coming indoors. GPS is asked separately, because fused can
+        // fall back to a rough network position (seen: 1991 m off for minutes beside the car) while satellites are available.
+        if(locations.hasProvider(LocationManager.FUSED_PROVIDER)) {
+            fusedListener=this::onFix;
+            locations.requestLocationUpdates(LocationManager.FUSED_PROVIDER,request,getMainExecutor(),fusedListener);
+        }
+        if(locations.hasProvider(LocationManager.GPS_PROVIDER)) {
+            satelliteListener=this::onFix;
+            locations.requestLocationUpdates(LocationManager.GPS_PROVIDER,request,getMainExecutor(),satelliteListener);
+        }
         connectivity=getSystemService(ConnectivityManager.class);
         connectivity.registerNetworkCallback(new NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build(),wifiCallback);
         AppRuntime.status(this,"Location monitoring on.");
     }
     /** Saves the disarmed state before any start, so a restart cannot repeat a start. */
     private void onFix(Location fix) {
+        long age=(SystemClock.elapsedRealtimeNanos()-fix.getElapsedRealtimeNanos())/1000000;
         double metres=ProximityGate.metres(fix.getLatitude(),fix.getLongitude(),carLatitude,carLongitude);
-        ProximityGate.Event event=proximity.observe(metres,fix.getAccuracy(),cooldownPassed() && !onTrustedWifi());
-        showProximity(Math.round(metres)+" m");
+        boolean rough=fix.getAccuracy()>rearmMetres;
+        // A reading delivered more than 30 s late can't start or arm anything. It's shown with its own time, so it looks stale.
+        ProximityGate.Event event=age>30000?ProximityGate.Event.NONE
+            :proximity.observe(metres,fix.getAccuracy(),cooldownPassed() && !onTrustedWifi());
+        AppRuntime.log(this,fix.getProvider()+" "+Math.round(metres)+" m ±"+Math.round(fix.getAccuracy())+" m, "+age/1000+" s old"
+            +(event==ProximityGate.Event.NONE?"":", "+event));
+        showProximity(Math.round(metres)+" m"+(rough?" ±"+Math.round(fix.getAccuracy()):""),System.currentTimeMillis()-age);
         if(event==ProximityGate.Event.LEFT) checkCar(Math.round(metres)+" m ±"+Math.round(fix.getAccuracy())+" m");
         if(event!=ProximityGate.Event.FIRE) return;
         AppRuntime.prefs(this).edit().putLong("lastAutoStartAt",System.currentTimeMillis()).putBoolean("gateArmed",false).commit();
@@ -163,7 +174,7 @@ public final class MonitorService extends Service {
         AppRuntime.prefs(this).edit().putBoolean("gateArmed",proximity.armed()).commit();
         if(drove) AppRuntime.proximityEvent(this,"Car moved "+moved+" m: following it");
         else if(!wasArmed) AppRuntime.proximityEvent(this,"Armed by GPS: "+reading);
-        showProximity(drove?"Car moved":lastDistance);
+        if(drove) showProximity("Car moved",System.currentTimeMillis()); else showProximity(lastDistance,lastDistanceAt);
         if(!drove && !wasArmed) leave(AppRuntime.leaveAction(this));
     }
     private boolean onTrustedWifi() { return currentWifi!=null && AppRuntime.trustedWifi(this).contains(currentWifi); }
@@ -183,7 +194,7 @@ public final class MonitorService extends Service {
         proximity.arm();
         AppRuntime.prefs(this).edit().putBoolean("gateArmed",true).commit();
         AppRuntime.proximityEvent(this,"Armed by Wi-Fi "+name+": "+signal+" dBm");
-        showProximity(lastDistance);
+        showProximity(lastDistance,lastDistanceAt);
     }
     /** Minimum minutes between automatic starts, so passing the car again soon does not start it again. */
     private boolean cooldownPassed() {
@@ -191,9 +202,10 @@ public final class MonitorService extends Service {
         long minutes=AppRuntime.cooldownMinutes(this);
         return System.currentTimeMillis()-prefs.getLong("lastAutoStartAt",0)>=minutes*60000L;
     }
-    private void showProximity(String distance) {
-        lastDistance=distance;
-        AppRuntime.setProximity(this,proximity.armed(),distance);
+    /** at: when the shown reading was taken, so the widget's time is the reading's, not the refresh's. */
+    private void showProximity(String distance,long at) {
+        lastDistance=distance; lastDistanceAt=at;
+        AppRuntime.setProximity(this,proximity.armed(),distance,at);
     }
     private void startBle() {
         if(Build.VERSION.SDK_INT>=31 && checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN)!=PackageManager.PERMISSION_GRANTED)
@@ -238,7 +250,8 @@ public final class MonitorService extends Service {
     @Override public void onDestroy() {
         stopped=true;
         handler.removeCallbacksAndMessages(null);
-        if(locations!=null) locations.removeUpdates(gpsListener);
+        if(fusedListener!=null) locations.removeUpdates(fusedListener);
+        if(satelliteListener!=null) locations.removeUpdates(satelliteListener);
         if(connectivity!=null) connectivity.unregisterNetworkCallback(wifiCallback);
         try {
             if(scanner!=null && (Build.VERSION.SDK_INT<31 || checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN)==PackageManager.PERMISSION_GRANTED))
@@ -246,7 +259,7 @@ public final class MonitorService extends Service {
         } catch(IllegalStateException ignored) {
             // Bluetooth can be disabled externally while the service is stopping.
         }
-        AppRuntime.setProximity(this,false,"Off");
+        AppRuntime.setProximity(this,false,"Off",System.currentTimeMillis());
         super.onDestroy();
     }
     @Override public IBinder onBind(Intent intent) { return null; }
