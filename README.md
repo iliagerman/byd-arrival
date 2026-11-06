@@ -132,11 +132,11 @@ How it behaves:
 - **It must see you leave first.** It starts disarmed, so turning it on beside the car does nothing.
 - **Inaccurate readings can't fire it.** Readings less accurate than the re-arm distance are ignored.
 - **A failed command stops monitoring,** with a message explaining why. A failed walk-away action doesn't, because it can't repeat before your next arrival.
-- **The walk-away action runs once you're past the re-arm distance after an auto-start.** With GPS, the app first asks BYD where the car is. If the car moved more than the re-arm distance, you drove off, and the action is skipped. Arming by a trusted Wi-Fi never runs it. With a Bluetooth beacon, it runs once the beacon has been out of range long enough to re-arm (see below).
+- **The walk-away action runs once you're past the re-arm distance after an auto-start.** With GPS, it runs only when BYD reports the car still at its spot, so driving off doesn't run it; it runs once you walk away from where you parked. Arming by a trusted Wi-Fi never runs it. With a Bluetooth beacon, it runs once the beacon has been out of range long enough to re-arm (see below).
 - **It restarts by itself** after an app update, after the phone restarts, and if Android stops the app. The event line then says so, for example `Restarted after the phone restarted`.
 - **It keeps trying when it can't reach the car.** If BYD has no position for the car or the network isn't up yet (common right after a restart), it tries again after 1 minute, then less often, up to every 15 minutes. Only **Stop**, a failed car command, signing in again or forgetting credentials turn it off.
 - **It shows when readings stop.** If no location reading arrives for 10 minutes, the status says `No reading since 02:09:09` instead of the last distance.
-- **Restart monitoring after parking somewhere new.** The car's position is only read when monitoring starts.
+- **It follows the car.** When you get past the re-arm distance after a start, or after being at the car, the app asks BYD where the car is, at most once a minute. If the car moved, you drove it: the app saves its new spot (the event line says `Car moved 1991 m: following it`) and waits for you to walk away from there. If it's still where it was, you walked away, and the trigger arms. Once armed and away, it stops asking, so a parked car is rarely asked.
 
 Phone location is often several metres off, and worse indoors. Very short distances may not work reliably.
 

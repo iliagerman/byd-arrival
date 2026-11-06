@@ -91,11 +91,14 @@ public final class MonitorService extends Service {
         handler.postDelayed(this::startGps,retryMs);
         retryMs=Math.min(retryMs*2,15*60000L);
     }
+    /** Set when the service ends, so a car check that answers afterwards changes nothing. */
+    private boolean stopped;
     private void beginGps(double[] car) {
         if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED) {
             stopWithStatus("Allow location for this app, then try again."); return;
         }
         carLatitude=car[0]; carLongitude=car[1];
+        lastCheck=SystemClock.elapsedRealtime();
         android.content.SharedPreferences prefs=AppRuntime.prefs(this);
         fireMetres=AppRuntime.fireMetres(this); rearmMetres=AppRuntime.rearmMetres(this);
         proximity=new ProximityGate(fireMetres,rearmMetres,prefs.getBoolean("gateArmed",false));
@@ -112,20 +115,56 @@ public final class MonitorService extends Service {
         connectivity.registerNetworkCallback(new NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build(),wifiCallback);
         AppRuntime.status(this,"Location monitoring on.");
     }
-    /** Saves the armed state on every change, before any start, so a restart cannot repeat a start. */
+    /** Saves the disarmed state before any start, so a restart cannot repeat a start. */
     private void onFix(Location fix) {
-        boolean wasArmed=proximity.armed();
         double metres=ProximityGate.metres(fix.getLatitude(),fix.getLongitude(),carLatitude,carLongitude);
-        boolean fire=proximity.observe(metres,fix.getAccuracy(),cooldownPassed() && !onTrustedWifi());
-        if(fire) AppRuntime.prefs(this).edit().putLong("lastAutoStartAt",System.currentTimeMillis()).commit();
-        if(wasArmed!=proximity.armed()) {
-            AppRuntime.prefs(this).edit().putBoolean("gateArmed",proximity.armed()).commit();
-            AppRuntime.proximityEvent(this,fire?"Triggered at "+Math.round(metres)+" m"
-                :"Armed by GPS: "+Math.round(metres)+" m ±"+Math.round(fix.getAccuracy())+" m");
-            if(!fire) walkedAway();
-        }
+        ProximityGate.Event event=proximity.observe(metres,fix.getAccuracy(),cooldownPassed() && !onTrustedWifi());
         showProximity(Math.round(metres)+" m");
-        if(fire) arrival();
+        if(event==ProximityGate.Event.LEFT) checkCar(Math.round(metres)+" m ±"+Math.round(fix.getAccuracy())+" m");
+        if(event!=ProximityGate.Event.FIRE) return;
+        AppRuntime.prefs(this).edit().putLong("lastAutoStartAt",System.currentTimeMillis()).putBoolean("gateArmed",false).commit();
+        AppRuntime.proximityEvent(this,"Triggered at "+Math.round(metres)+" m");
+        arrival();
+    }
+    /** A car check is running, and when the last one ended (elapsed time), so they run at most once a minute. */
+    private boolean checking;
+    private long lastCheck;
+    /**
+     * You got away from the car's saved spot, by walking or by driving it. BYD is asked where the car is: at most once
+     * a minute, and only until you have walked away from where it's parked, so a parked car is rarely asked.
+     */
+    private void checkCar(String reading) {
+        if(checking || SystemClock.elapsedRealtime()-lastCheck<60000) return;
+        checking=true;
+        AppRuntime.IO.execute(()-> {
+            try {
+                double[] car=AppRuntime.api(this).location(AppRuntime.prefs(this).getString("vin",""));
+                handler.post(()->carChecked(car,reading));
+            } catch(Exception error) {
+                AppRuntime.clearSession();
+                handler.post(()-> {
+                    checking=false; lastCheck=SystemClock.elapsedRealtime();
+                    AppRuntime.note(this,"Couldn't check where the car is: "+AppRuntime.safeError(error)+" Trying again in a minute.");
+                });
+            }
+        });
+    }
+    /**
+     * Moved more than the re-arm distance: you drove it, so its new spot is saved and the trigger waits for you to leave it.
+     * Still there: you walked away, so the trigger arms and, if it had fired, the walk-away action runs.
+     */
+    private void carChecked(double[] car,String reading) {
+        checking=false; lastCheck=SystemClock.elapsedRealtime();
+        if(stopped) return;
+        long moved=Math.round(ProximityGate.metres(car[0],car[1],carLatitude,carLongitude));
+        boolean drove=moved>rearmMetres, wasArmed=proximity.armed();
+        if(drove) { carLatitude=car[0]; carLongitude=car[1]; }
+        proximity.carChecked(drove);
+        AppRuntime.prefs(this).edit().putBoolean("gateArmed",proximity.armed()).commit();
+        if(drove) AppRuntime.proximityEvent(this,"Car moved "+moved+" m: following it");
+        else if(!wasArmed) AppRuntime.proximityEvent(this,"Armed by GPS: "+reading);
+        showProximity(drove?"Car moved":lastDistance);
+        if(!drove && !wasArmed) leave(AppRuntime.leaveAction(this));
     }
     private boolean onTrustedWifi() { return currentWifi!=null && AppRuntime.trustedWifi(this).contains(currentWifi); }
     /**
@@ -190,25 +229,6 @@ public final class MonitorService extends Service {
         handler.postDelayed(()->scanRound(everyMs),everyMs);
     }
     private void stopWithStatus(String message) { AppRuntime.status(this,message); stopSelf(); }
-    /**
-     * The GPS trigger re-armed: you got past the re-arm distance. The car's position is read only when monitoring
-     * starts, so driving off does the same. The walk-away action runs only if the car is still where it was.
-     */
-    private void walkedAway() {
-        String action=AppRuntime.leaveAction(this);
-        if(action.isEmpty()) return;
-        AppRuntime.IO.execute(()-> {
-            try {
-                double[] car=AppRuntime.api(this).location(AppRuntime.prefs(this).getString("vin",""));
-                long moved=Math.round(ProximityGate.metres(car[0],car[1],carLatitude,carLongitude));
-                if(moved>rearmMetres) AppRuntime.note(this,"Walk-away action skipped: the car moved "+moved+" m, so you drove off.");
-                else leave(action);
-            } catch(Exception error) {
-                AppRuntime.clearSession();
-                AppRuntime.note(this,"Walk-away action skipped: "+AppRuntime.safeError(error));
-            }
-        });
-    }
     /** A failure here doesn't stop monitoring: the trigger is armed, so it can't repeat before your next arrival. */
     private void leave(String action) {
         if(action.isEmpty()) return;
@@ -216,6 +236,7 @@ public final class MonitorService extends Service {
     }
     private void arrival() { AppRuntime.execute(this,Actions.arrival(AppRuntime.arrivalAction(this),AppRuntime.customs(this)),true,()->{}); }
     @Override public void onDestroy() {
+        stopped=true;
         handler.removeCallbacksAndMessages(null);
         if(locations!=null) locations.removeUpdates(gpsListener);
         if(connectivity!=null) connectivity.unregisterNetworkCallback(wifiCallback);
