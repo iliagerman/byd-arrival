@@ -111,11 +111,16 @@ final class AppRuntime {
     static void proximityEvent(Context c,String text) {
         prefs(c).edit().putString("proximityEvent",text+" · "+android.text.format.DateFormat.format("HH:mm:ss",System.currentTimeMillis())).apply();
     }
-    /** Shown next to the icon: armed or not, distance to the car and time of the last reading. Monitoring stopped: "Off". */
+    /**
+     * Shown next to the icon: armed or not, distance to the car and time of the last reading. Monitoring stopped: "Off".
+     * Readings normally arrive every few seconds, so one older than 10 minutes means they stopped, and it says so.
+     */
     static String proximityLabel(SharedPreferences p) {
         String distance=p.getString("proximityDistance","Off");
         if(distance.equals("Off")) return distance;
-        String time=android.text.format.DateFormat.format("HH:mm:ss",p.getLong("proximityAt",0)).toString();
+        long at=p.getLong("proximityAt",0);
+        String time=android.text.format.DateFormat.format("HH:mm:ss",at).toString();
+        if(System.currentTimeMillis()-at>10*60000L) return "No reading since "+time;
         return (p.getBoolean("proximityArmed",false)?"Armed":"Not armed")+" · "+distance+" · "+time;
     }
     static void status(Context c,String message) {

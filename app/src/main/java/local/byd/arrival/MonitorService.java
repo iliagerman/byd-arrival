@@ -50,10 +50,12 @@ public final class MonitorService extends Service {
             AppRuntime.status(MonitorService.this,"Bluetooth scan failed ("+code+"). Monitoring stopped."); stopSelf();
         }
     };
+    /** Sticky: if Android ends the app while monitoring, it restarts this service with no intent, in the mode last used. */
     @Override public int onStartCommand(Intent intent,int flags,int startId) {
-        if("STOP".equals(intent.getAction())) { stopSelf(); return START_NOT_STICKY; }
-        if(active!=null) return START_NOT_STICKY;
-        active=intent.getStringExtra("mode");
+        if(intent!=null && "STOP".equals(intent.getAction())) { stopSelf(); return START_NOT_STICKY; }
+        if(active!=null) return START_STICKY;
+        if(intent==null) AppRuntime.proximityEvent(this,"Restarted after Android stopped the app");
+        active=intent!=null?intent.getStringExtra("mode"):AppRuntime.prefs(this).getString("monitorMode","gps");
         AppRuntime.prefs(this).edit().putString("monitorMode",active).apply();
         boolean gps="gps".equals(active);
         startForeground(11,AppRuntime.notification(this,"Monitoring the car. Tap Stop to disable.","monitor"),
@@ -63,7 +65,7 @@ public final class MonitorService extends Service {
         } catch(Exception error) {
             AppRuntime.status(this,"Cannot monitor: "+error.getMessage()); stopSelf();
         }
-        return START_NOT_STICKY;
+        return START_STICKY;
     }
     /** GPS mode first reads the car's position from BYD, then tracks the phone against it. */
     private void startGps() {

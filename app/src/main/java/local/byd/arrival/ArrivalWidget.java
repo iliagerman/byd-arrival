@@ -9,12 +9,15 @@ import java.util.List;
 
 /** Home-screen widget: one-tap actions using the stored PIN; no unlock or password prompt. */
 public final class ArrivalWidget extends AppWidgetProvider {
-    /** An app update kills the monitor without onDestroy. Restart it if it was on, so you don't have to. */
+    /** An app update or a phone restart ends the monitor without onDestroy. Restart it if it was on, so you don't have to. */
     @Override public void onReceive(Context context,Intent intent) {
-        if(Intent.ACTION_MY_PACKAGE_REPLACED.equals(intent.getAction())) {
+        String action=intent.getAction();
+        if(Intent.ACTION_MY_PACKAGE_REPLACED.equals(action) || Intent.ACTION_BOOT_COMPLETED.equals(action)) {
             SharedPreferences prefs=AppRuntime.prefs(context);
-            if(prefs.getBoolean("monitoring",false))
+            if(prefs.getBoolean("monitoring",false)) {
+                if(Intent.ACTION_BOOT_COMPLETED.equals(action)) AppRuntime.proximityEvent(context,"Restarted after the phone restarted");
                 context.startForegroundService(new Intent(context,MonitorService.class).putExtra("mode",prefs.getString("monitorMode","gps")));
+            }
             else AppRuntime.setProximity(context,false,"Off");
             return;
         }

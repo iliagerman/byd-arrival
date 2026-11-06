@@ -127,7 +127,8 @@ How it behaves:
 - **It must see you leave first.** It starts disarmed, so turning it on beside the car does nothing.
 - **Inaccurate readings can't fire it.** Readings less accurate than the re-arm distance are ignored.
 - **A failed command stops monitoring,** with a message explaining why.
-- **It restarts after an app update, but not after a reboot.** After restarting your phone, tap **Start monitoring** again.
+- **It restarts by itself** after an app update, after the phone restarts, and if Android stops the app. The event line then says so, for example `Restarted after the phone restarted`.
+- **It shows when readings stop.** If no location reading arrives for 10 minutes, the status says `No reading since 02:09:09` instead of the last distance.
 - **Restart monitoring after parking somewhere new.** The car's position is only read when monitoring starts.
 
 Phone location is often several metres off, and worse indoors. Very short distances may not work reliably.
