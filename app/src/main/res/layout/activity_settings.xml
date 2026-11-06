@@ -72,6 +72,7 @@
             <TextView style="@style/Body" android:text="@string/arrival_body" />
             <TextView style="@style/FieldLabel" android:text="@string/arrival_action" />
             <Spinner android:id="@+id/arrival_action" android:layout_width="match_parent" android:layout_height="48dp" android:layout_marginTop="4dp" />
+            <TextView style="@style/Body" android:text="@string/arrival_hint" android:textSize="13sp" />
             <TextView style="@style/FieldLabel" android:text="@string/leave_action" />
             <Spinner android:id="@+id/leave_action" android:layout_width="match_parent" android:layout_height="48dp" android:layout_marginTop="4dp" />
             <TextView style="@style/Body" android:text="@string/leave_hint" />

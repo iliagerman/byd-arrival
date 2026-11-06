@@ -19,7 +19,7 @@ You need:
 
 | Button | What it sends |
 |---|---|
-| **Start car** | Smart climate start, described [below](#start-car). BYD has no remote engine-start command, so starting the A/C is what powers the car on. |
+| **Start car** | Smart climate start, described [below](#start-car). BYD has no remote engine-start command, so starting the A/C is what powers the car on. This is remote mode: to drive, you need the key, or tap **Turn off**, then **Unlock**, then start the car yourself. |
 | **Turn off** | A/C off, and nothing else. On the Atto 3 this also shuts the car down. |
 | **Unlock** / **Lock** | Unlocks or locks the doors. |
 | **Close & lock** | Turns the car off (A/C off), closes the windows and the tailgate, then locks. Every step is sent even if one fails, so a failure can't leave the car unlocked; the result lists what failed. |
@@ -106,9 +106,9 @@ Settings → **Custom actions** → **New custom action**. Give it a name and ti
 
 ### Auto-start near the car
 
-This unlocks the car and runs an action when your phone comes close to the parked car. It's off until you start it. The walkthrough after your first login covers the setup, or you can do it yourself under Settings → **AUTOMATION**:
+This unlocks the car when your phone comes close to the parked car, so you can get in and drive. It's off until you start it. The walkthrough after your first login covers the setup, or you can do it yourself under Settings → **AUTOMATION**:
 
-1. Choose what **After unlocking, auto-start runs** (default: Start car). Auto-start always unlocks the doors first, so you can get in even if that action fails. If your custom action already includes Unlock, it runs in your order instead.
+1. Choose what **When you arrive, run** (default: Unlock). It always unlocks the doors first; if your custom action already includes Unlock, it runs in your order instead. Keep it on Unlock if you drive without the key: Start car and A/C on put the car in remote mode, and BYD then asks for the key before you can drive, even after another unlock (the official app's unlock too). With the car off, an unlock lets you start it yourself.
 2. Set the distances and timing:
    - **Start the car when within:** default 15 m.
    - **Re-arm after getting further than:** default 20 m.
@@ -116,7 +116,7 @@ This unlocks the car and runs an action when your phone comes close to the parke
    - **Check every:** default 5 seconds. How often the app measures your distance, or scans for the Bluetooth beacon. Shorter reacts sooner but uses more battery. Android can deliver location readings less often than asked, especially indoors.
 3. Tap **Start monitoring**. The app reads the car's position, then follows your phone's location.
 4. Choose **When you walk away, run** (default: Close & lock), or Nothing to turn it off.
-5. Walk away. The next time you come within the start distance, the car unlocks and the action runs.
+5. Walk away. The next time you come within the start distance, the car unlocks.
 
 You can't save values that don't work together, because the app adjusts them for you and shows the result:
 
