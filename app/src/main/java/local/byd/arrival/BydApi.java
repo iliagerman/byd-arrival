@@ -110,7 +110,21 @@ public final class BydApi {
     /** A GPS response holding only the correlation id means the car has not reported a fix yet. */
     private static boolean onlySerial(JSONObject data) { return data.length()==1 && data.has("requestSerial"); }
     /** Returns {latitude, longitude} of the car. */
-    public double[] location(String vin) throws Exception { return position(gpsInfo(vin)); }
+    public double[] location(String vin) throws Exception { return firstPosition(()->gpsInfo(vin),4,15000); }
+    /** BYD's answer (0, 0) while the car hasn't reported a position yet. */
+    static final class NoPosition extends IOException {
+        NoPosition() { super("BYD has no position for the car right now. Start monitoring again in a minute."); }
+    }
+    /**
+     * BYD answers 0, 0 until the car reports a fix, which can take some seconds after it wakes (seen right after a
+     * phone restart). Asks again, waitMs apart, up to tries times. Read-only, so asking again is safe.
+     */
+    static double[] firstPosition(java.util.concurrent.Callable<JSONObject> ask,int tries,long waitMs) throws Exception {
+        for(int attempt=1;;attempt++) {
+            try { return position(ask.call()); }
+            catch(NoPosition none) { if(attempt==tries) throw none; Thread.sleep(waitMs); }
+        }
+    }
     /**
      * Reads a GPS response, tolerating nested data and alternate field names. BYD sometimes answers 0, 0 when it
      * has no position; that point is thousands of kilometres away and would arm auto-start, so it is rejected.
@@ -120,7 +134,7 @@ public final class BydApi {
         JSONObject source=nested!=null?nested:data;
         double lat=coordinate(source,"latitudeDone","latitude");
         double lon=coordinate(source,"longitudeDone","longitude");
-        if(lat==0 && lon==0) throw new IOException("BYD has no position for the car right now. Start monitoring again in a minute.");
+        if(lat==0 && lon==0) throw new NoPosition();
         return new double[]{lat,lon};
     }
     private static double coordinate(JSONObject source,String primary,String fallback) throws IOException {

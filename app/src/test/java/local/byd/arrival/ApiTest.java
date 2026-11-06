@@ -37,6 +37,14 @@ public final class ApiTest {
         check(at[0]==32.1 && at[1]==34.8,"car position read from nested GPS data");
         try { BydApi.position(new JSONObject().put("data",new JSONObject().put("latitude",0).put("longitude",0)));throw new AssertionError("must reject 0,0"); }
         catch(IOException expected) { check(expected.getMessage().startsWith("BYD "),"0,0 is no position, and the reason is shown to the user"); }
+        JSONObject none=new JSONObject().put("data",new JSONObject().put("latitude",0).put("longitude",0));
+        JSONObject fix=new JSONObject().put("data",new JSONObject().put("latitude",32.75).put("longitude",34.97));
+        int[] asked={0};
+        double[] found=BydApi.firstPosition(()->++asked[0]<3?none:fix,4,0);
+        check(found[0]==32.75 && asked[0]==3,"asks again while BYD has no position, and returns the first real one");
+        asked[0]=0;
+        try { BydApi.firstPosition(()-> { asked[0]++; return none; },4,0); throw new AssertionError("must give up"); }
+        catch(IOException expected) { check(asked[0]==4,"gives up after 4 tries with no position"); }
         System.out.println("PASS: "+checks+" API fixture checks");
     }
     static final class Fixture extends HttpURLConnection {
