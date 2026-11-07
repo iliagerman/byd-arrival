@@ -10,7 +10,7 @@ import java.nio.charset.StandardCharsets;
 /** In-memory HTTPS fixture. Uses synthetic credentials; never contacts BYD. */
 public final class ApiTest {
     static Bangcle cipher;
-    static int triggers,polls,checks;
+    static int triggers,polls,checks,logins,sessionEnds;
     static boolean reject;
     static final String USER="fixture@example.invalid", PASS="synthetic-password", PIN="123456";
     static void check(boolean ok,String text) { checks++;if(!ok)throw new AssertionError(text); }
@@ -29,6 +29,13 @@ public final class ApiTest {
         try { api.command("SYNTHETICVIN","OPENDOOR",null);throw new AssertionError("must reject PIN error"); }
         catch(IOException expected) { check(expected.getMessage().contains("5011"),"numeric error only"); }
         check(triggers==2,"rejected command not retried");
+        reject=false; int before=logins; sessionEnds=1;
+        api.command("SYNTHETICVIN","OPENAIR",BydApi.climateParams(21,17,5,30));
+        check(logins==before+1,"a session ended by a login elsewhere signs in again by itself");
+        check(triggers==3,"the command BYD refused for the ended session is sent once more, once");
+        before=logins; sessionEnds=2;
+        try { api.command("SYNTHETICVIN","OPENAIR",BydApi.climateParams(21,17,5,30));throw new AssertionError("must give up"); }
+        catch(IOException expected) { check(logins==before+1 && triggers==3 && expected.getMessage().startsWith("BYD "),"signs in again only once, then reports why"); }
         check(BydApi.finished(new JSONObject().put("res",2)),"immediate success needs no serial");
         check(!BydApi.finished(new JSONObject().put("controlState",0)),"controlState 0 is pending");
         try { BydApi.finished(new JSONObject().put("controlState",2));throw new AssertionError("must reject failure"); }
@@ -64,10 +71,12 @@ public final class ApiTest {
                 Object payload;
                 if(endpoint.endsWith("/login")) {
                     check(outer.getString("signKey").equals(PASS),"password in encrypted envelope only");
-                    key=Crypto.md5(Crypto.md5(PASS));
+                    key=Crypto.md5(Crypto.md5(PASS)); logins++;
                     check(new JSONObject(Crypto.decrypt(outer.getString("encryData"),key)).getString("timeZone").equals("Australia/Sydney"),"login carries the phone's time zone");
                     payload=new JSONObject().put("token",new JSONObject().put("userId","fixture-user").put("encryToken","test-encryption-token").put("signToken","test-sign-token"));
                 } else {
+                    // The same account signing in elsewhere ends this session: BYD answers 1005 and does nothing.
+                    if(sessionEnds>0) { sessionEnds--; return response(new JSONObject().put("code","1005")); }
                     JSONObject inner=new JSONObject(Crypto.decrypt(outer.getString("encryData"),key));
                     if(endpoint.endsWith("getAllListByUserId")) payload=new JSONArray().put(new JSONObject().put("vin","SYNTHETICVIN"));
                     else {

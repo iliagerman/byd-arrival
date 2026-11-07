@@ -83,7 +83,7 @@ Long-press your home screen → Widgets → **BYD Arrival**, or use Settings →
 
 ### Home screen
 
-Shows the latest status, the auto-start state, a large **Start car** button and a tile for every action. Commands are never retried automatically. If a result is unknown, check the car before trying again.
+Shows the latest status, the auto-start state, a large **Start car** button and a tile for every action. Commands are never retried automatically, with one exception: signing in with the same account elsewhere, for example in the official app, ends this app's session. BYD then refuses the next request without acting on it, so the app signs in again and sends it once more by itself. If a result is unknown, check the car before trying again.
 
 ### Start car
 

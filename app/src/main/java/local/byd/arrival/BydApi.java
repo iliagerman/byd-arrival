@@ -66,7 +66,24 @@ public final class BydApi {
         fresh.getString("userId"); fresh.getString("encryToken"); fresh.getString("signToken");
         token=fresh; authenticatedAt=System.currentTimeMillis();
     }
+    /**
+     * Signing in with the same account elsewhere, e.g. in the official app, ends this session. BYD then refuses the
+     * request without acting on it, so signing in again and sending it once more is safe. Nothing else is retried.
+     */
     private synchronized Object request(String endpoint, Map<String,String> inner) throws Exception {
+        try { return send(endpoint,inner); }
+        catch(SessionEnded ended) {
+            if(inner.containsKey("random")) inner.put("random",random());
+            if(inner.containsKey("timeStamp")) inner.put("timeStamp",Long.toString(System.currentTimeMillis()));
+            return send(endpoint,inner);
+        }
+    }
+    /** BYD's codes for an ended session, as in pyBYD. */
+    private static final Set<String> SESSION_ENDED=Set.of("1002","1005","1010");
+    static final class SessionEnded extends IOException {
+        SessionEnded(String code) { super("BYD ended the session (code "+code+"), probably because the account signed in elsewhere. Try again."); }
+    }
+    private Object send(String endpoint, Map<String,String> inner) throws Exception {
         if (token==null || System.currentTimeMillis()-authenticatedAt>12*3600000L) login();
         String now=Long.toString(System.currentTimeMillis());
         String contentKey=Crypto.md5(token.getString("encryToken"));
@@ -267,7 +284,8 @@ public final class BydApi {
             JSONObject result=new JSONObject(decoded);
             String code=String.valueOf(result.get("code"));
             if(!code.equals("0")) {
-                if(Set.of("1002","1003","1004").contains(code)) token=null;
+                if(SESSION_ENDED.contains(code)) { token=null; throw new SessionEnded(code); }
+                if(Set.of("1003","1004").contains(code)) token=null;
                 throw new IOException("BYD API rejected request (code "+(code.matches("[0-9]+")?code:"unknown")+"); no retry");
             }
             return result;
