@@ -124,28 +124,35 @@ public final class MonitorService extends Service {
     private void onFix(Location fix) {
         long age=(SystemClock.elapsedRealtimeNanos()-fix.getElapsedRealtimeNanos())/1000000;
         double metres=ProximityGate.metres(fix.getLatitude(),fix.getLongitude(),carLatitude,carLongitude);
-        boolean rough=fix.getAccuracy()>rearmMetres;
+        boolean rough=fix.getAccuracy()>rearmMetres, late=age>30000;
+        // Faster than 25 km/h you're in a vehicle, not walking up to the car, so it never starts then.
+        boolean moving=fix.hasSpeed() && fix.getSpeed()>DRIVING_METRES_PER_SECOND;
         // A reading delivered more than 30 s late can't start or arm anything. It's shown with its own time, so it looks stale.
-        ProximityGate.Event event=age>30000?ProximityGate.Event.NONE
-            :proximity.observe(metres,fix.getAccuracy(),cooldownPassed() && !onTrustedWifi());
+        ProximityGate.Event event=late?ProximityGate.Event.NONE
+            :proximity.observe(metres,fix.getAccuracy(),cooldownPassed() && !onTrustedWifi() && !moving);
         AppRuntime.log(this,fix.getProvider()+" "+Math.round(metres)+" m ±"+Math.round(fix.getAccuracy())+" m, "+age/1000+" s old"
-            +(event==ProximityGate.Event.NONE?"":", "+event));
+            +(moving?", "+Math.round(fix.getSpeed()*3.6)+" km/h":"")+(event==ProximityGate.Event.NONE?"":", "+event));
         showProximity(Math.round(metres)+" m"+(rough?" ±"+Math.round(fix.getAccuracy()):""),System.currentTimeMillis()-age);
-        if(event==ProximityGate.Event.LEFT) checkCar(Math.round(metres)+" m ±"+Math.round(fix.getAccuracy())+" m");
+        String reading=Math.round(metres)+" m ±"+Math.round(fix.getAccuracy())+" m";
+        if(event==ProximityGate.Event.LEFT) checkCar(reading,60000);
+        // Leaving is only seen after a good reading beside the car. Without one (GPS is often rough there), the car could
+        // be driven off unnoticed, so while you're in a vehicle the app also checks whether the car moves with you.
+        else if(moving && !late) checkCar(reading,5*60000);
         if(event!=ProximityGate.Event.FIRE) return;
         AppRuntime.prefs(this).edit().putLong("lastAutoStartAt",System.currentTimeMillis()).putBoolean("gateArmed",false).commit();
         AppRuntime.proximityEvent(this,"Triggered at "+Math.round(metres)+" m");
         arrival();
     }
-    /** A car check is running, and when the last one ended (elapsed time), so they run at most once a minute. */
+    private static final float DRIVING_METRES_PER_SECOND=7; // 25 km/h
+    /** A car check is running, and when the last one ended (elapsed time), so checks are spaced out. */
     private boolean checking;
     private long lastCheck;
     /**
-     * You got away from the car's saved spot, by walking or by driving it. BYD is asked where the car is: at most once
-     * a minute, and only until you have walked away from where it's parked, so a parked car is rarely asked.
+     * You got away from the car's saved spot, by walking or by driving it, or you're in a vehicle. BYD is asked where the
+     * car is, at most once per gapMs: once a minute after leaving, every 5 minutes while in a vehicle.
      */
-    private void checkCar(String reading) {
-        if(checking || SystemClock.elapsedRealtime()-lastCheck<60000) return;
+    private void checkCar(String reading,long gapMs) {
+        if(checking || SystemClock.elapsedRealtime()-lastCheck<gapMs) return;
         checking=true;
         AppRuntime.IO.execute(()-> {
             try {
