@@ -42,6 +42,18 @@ final class AppRuntime {
     static int fireMetres(Context c) { return prefs(c).getInt("fireMetres",AutoStartSettings.DEFAULT_START); }
     static int rearmMetres(Context c) { return prefs(c).getInt("rearmMetres",AutoStartSettings.DEFAULT_REARM); }
     static int cooldownMinutes(Context c) { return prefs(c).getInt("cooldownMinutes",AutoStartSettings.DEFAULT_MINUTES); }
+    static Abroad abroad(Context c) { return new Abroad(prefs(c).getBoolean("abroad",false),prefs(c).getBoolean("abroadBeenFar",false)); }
+    static void setAbroad(Context c,Abroad state) { prefs(c).edit().putBoolean("abroad",state.on).putBoolean("abroadBeenFar",state.beenFar).apply(); }
+    /** The car's last position read from BYD, kept so abroad mode can measure the distance without asking BYD. */
+    static void saveCar(Context c,double latitude,double longitude) {
+        prefs(c).edit().putString("carLatitude",Double.toString(latitude)).putString("carLongitude",Double.toString(longitude)).apply();
+    }
+    /** null before the car's position was ever read. */
+    static double[] savedCar(Context c) {
+        SharedPreferences p=prefs(c);
+        if(!p.contains("carLatitude")) return null;
+        return new double[]{Double.parseDouble(p.getString("carLatitude","")),Double.parseDouble(p.getString("carLongitude",""))};
+    }
     static int intervalSeconds(Context c) { return prefs(c).getInt("intervalSeconds",AutoStartSettings.DEFAULT_SECONDS); }
     static int wifiSignal(Context c) { return prefs(c).getInt("wifiSignal",AutoStartSettings.DEFAULT_WIFI_SIGNAL); }
     static void saveAutoStart(Context c,AutoStartSettings values) {
@@ -127,10 +139,6 @@ final class AppRuntime {
         prefs(c).edit().putString("proximityEvent",text+" · "+android.text.format.DateFormat.format("HH:mm:ss",System.currentTimeMillis())).apply();
         log(c,"event: "+text);
     }
-    /**
-     * Rolling log of location readings, events and statuses, without coordinates. Readable over ADB at
-     * /sdcard/Android/data/local.byd.arrival/files/readings.log; the previous half MB is kept in readings.old.log.
-     */
     /** The last lines of the log, older file first, for sharing. */
     static String logTail(Context c,int lines) throws IOException {
         List<String> all=new ArrayList<>();
@@ -140,6 +148,10 @@ final class AppRuntime {
         }
         return String.join("\n",all.subList(Math.max(0,all.size()-lines),all.size()));
     }
+    /**
+     * Rolling log of location readings, events and statuses, without coordinates. Readable over ADB at
+     * /sdcard/Android/data/local.byd.arrival/files/readings.log; the previous half MB is kept in readings.old.log.
+     */
     static void log(Context c,String line) {
         File dir=c.getExternalFilesDir(null), file=new File(dir,"readings.log");
         if(file.length()>512*1024 && !file.renameTo(new File(dir,"readings.old.log"))) android.util.Log.w("byd-arrival","Log rotation failed");
@@ -158,6 +170,7 @@ final class AppRuntime {
         if(distance.equals("Off")) return distance;
         long at=p.getLong("proximityAt",0);
         String time=android.text.format.DateFormat.format("HH:mm:ss",at).toString();
+        if(distance.startsWith("Abroad")) return distance+" · "+time;
         if(System.currentTimeMillis()-at>10*60000L) return "No reading since "+time;
         return (p.getBoolean("proximityArmed",false)?"Armed":"Not armed")+" · "+distance+" · "+time;
     }

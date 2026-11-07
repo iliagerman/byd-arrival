@@ -44,6 +44,7 @@ public final class SettingsActivity extends Activity {
         rssi.setText(Integer.toString(prefs.getInt("rssi",-65)));
         loadAutoStart();
         showWifi();
+        bindAbroad();
         ((EditText)findViewById(R.id.wifi_signal)).setText(String.valueOf(AppRuntime.wifiSignal(this)));
         start=new StartSettings(this);
         new ActionSettings(this);
@@ -245,6 +246,17 @@ public final class SettingsActivity extends Activity {
         AppWidgetManager manager=getSystemService(AppWidgetManager.class);
         if(manager.isRequestPinAppWidgetSupported()) manager.requestPinAppWidget(new ComponentName(this,ArrivalWidget.class),null,null);
         else toast("Long-press the home screen → Widgets → BYD Arrival.");
+    }
+    /** The switch saves the mode and restarts GPS monitoring, if it's on, so it takes effect straight away. */
+    private void bindAbroad() {
+        Switch abroad=findViewById(R.id.abroad);
+        abroad.setChecked(AppRuntime.abroad(this).on);
+        abroad.setOnCheckedChangeListener((view,on)-> {
+            AppRuntime.setAbroad(this,new Abroad(on,false));
+            android.content.SharedPreferences prefs=AppRuntime.prefs(this);
+            if(prefs.getBoolean("monitoring",false) && "gps".equals(prefs.getString("monitorMode","gps"))) startMonitor("gps");
+            toast(on?"Abroad mode on. Auto-start is paused until you're back within 700 km of the car.":"Abroad mode off.");
+        });
     }
     /** Sends the last 600 log lines (distances, margins, events; no coordinates) wherever you choose, e.g. to yourself. */
     private void shareLog() {

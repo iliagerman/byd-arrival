@@ -87,6 +87,15 @@ public class CoreTest {
         check(!BydApi.realtimeReady(new org.json.JSONObject().put("requestSerial", "x")), "an answer holding only the request id isn't ready");
         check(BydApi.batteryPercent(new org.json.JSONObject().put("elecPercent", -1)) == -1, "BYD's -1 means no battery level");
         check(BydApi.batteryPercent(new org.json.JSONObject()) == -1, "a missing battery level is reported as none");
+        Abroad atHome = new Abroad(false, false);
+        check(atHome.observe(5_000).equals(atHome), "at home, abroad mode stays off");
+        Abroad flown = atHome.observe(2_300_000);
+        check(flown.on && flown.beenFar, "beyond 700 km from the car, abroad mode turns on by itself");
+        check(flown.observe(3_000_000).equals(flown), "while away, it stays on");
+        check(!flown.observe(650_000).on, "back within 700 km, it turns itself off");
+        Abroad byHand = new Abroad(true, false);
+        check(byHand.observe(4_000).equals(byHand), "switched on at home before a trip, it stays on");
+        check(!byHand.observe(2_000_000).observe(10_000).on, "after the trip, back home, it turns itself off");
         ClimatePlan plan = ClimatePlan.defaults();
         check(plan.choose(16) == plan.freezing && plan.freezing.driverSeat && plan.freezing.temperature == 26, "below 17 °C: warm A/C and driver seat heat");
         check(plan.choose(17) == plan.cold && !plan.cold.driverSeat && plan.cold.temperature == 26, "17–20 °C: warm A/C, no seat heat");

@@ -71,8 +71,9 @@ public final class MonitorService extends Service {
         }
         return START_STICKY;
     }
-    /** GPS mode first reads the car's position from BYD, then tracks the phone against it. */
+    /** GPS mode first reads the car's position from BYD, then tracks the phone against it. Abroad, BYD isn't asked. */
     private void startGps() {
+        if(AppRuntime.abroad(this).on) { beginAbroad(); return; }
         AppRuntime.note(this,"Finding the car's position…");
         AppRuntime.IO.execute(()-> {
             try {
@@ -98,7 +99,9 @@ public final class MonitorService extends Service {
         if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED) {
             stopWithStatus("Allow location for this app, then try again."); return;
         }
+        stopTracking();
         carLatitude=car[0]; carLongitude=car[1];
+        AppRuntime.saveCar(this,carLatitude,carLongitude);
         lastCheck=SystemClock.elapsedRealtime();
         android.content.SharedPreferences prefs=AppRuntime.prefs(this);
         fireMetres=AppRuntime.fireMetres(this); rearmMetres=AppRuntime.rearmMetres(this);
@@ -120,10 +123,42 @@ public final class MonitorService extends Service {
         connectivity.registerNetworkCallback(new NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build(),wifiCallback);
         AppRuntime.status(this,"Location monitoring on.");
     }
+    /**
+     * Abroad: no auto-start, no car checks, no Wi-Fi arming. A rough reading every 15 minutes only tells when you're back
+     * within 700 km of the car's saved position. Without a saved position it waits until you switch it off.
+     */
+    private void beginAbroad() {
+        if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED) {
+            stopWithStatus("Allow location for this app, then try again."); return;
+        }
+        stopTracking();
+        double[] car=AppRuntime.savedCar(this);
+        AppRuntime.setProximity(this,false,"Abroad",System.currentTimeMillis());
+        if(car==null) { AppRuntime.status(this,"Abroad mode: auto-start paused. Switch it off in Settings when you're back."); return; }
+        carLatitude=car[0]; carLongitude=car[1];
+        locations=getSystemService(LocationManager.class);
+        LocationRequest rare=new LocationRequest.Builder(15*60000L).setQuality(LocationRequest.QUALITY_BALANCED_POWER_ACCURACY).build();
+        fusedListener=this::onFix;
+        locations.requestLocationUpdates(LocationManager.FUSED_PROVIDER,rare,getMainExecutor(),fusedListener);
+        AppRuntime.status(this,"Abroad mode: auto-start paused until you're back within 700 km of the car.");
+    }
+    /** Stops location readings and Wi-Fi arming, before switching between normal and abroad tracking. */
+    private void stopTracking() {
+        if(fusedListener!=null) locations.removeUpdates(fusedListener);
+        if(satelliteListener!=null) locations.removeUpdates(satelliteListener);
+        fusedListener=null; satelliteListener=null;
+        if(connectivity!=null) connectivity.unregisterNetworkCallback(wifiCallback);
+        connectivity=null;
+    }
     /** Saves the disarmed state before any start, so a restart cannot repeat a start. */
     private void onFix(Location fix) {
         long age=(SystemClock.elapsedRealtimeNanos()-fix.getElapsedRealtimeNanos())/1000000;
         double metres=ProximityGate.metres(fix.getLatitude(),fix.getLongitude(),carLatitude,carLongitude);
+        if(abroadChanged(metres)) return;
+        if(AppRuntime.abroad(this).on) {
+            AppRuntime.setProximity(this,false,"Abroad · "+Math.round(metres/1000)+" km",System.currentTimeMillis()-age);
+            return;
+        }
         boolean rough=fix.getAccuracy()>rearmMetres, late=age>30000;
         // Faster than 25 km/h you're in a vehicle, not walking up to the car, so it never starts then.
         boolean moving=fix.hasSpeed() && fix.getSpeed()>DRIVING_METRES_PER_SECOND;
@@ -142,6 +177,18 @@ public final class MonitorService extends Service {
         AppRuntime.prefs(this).edit().putLong("lastAutoStartAt",System.currentTimeMillis()).putBoolean("gateArmed",false).commit();
         AppRuntime.proximityEvent(this,"Triggered at "+Math.round(metres)+" m");
         arrival();
+    }
+    /** Crossing 700 km from the car switches between normal and abroad tracking. Returns true when it switched. */
+    private boolean abroadChanged(double metres) {
+        Abroad state=AppRuntime.abroad(this), next=state.observe(metres);
+        if(next.equals(state)) return false;
+        AppRuntime.setAbroad(this,next);
+        if(next.on==state.on) return false;
+        AppRuntime.proximityEvent(this,next.on?"Abroad: "+Math.round(metres/1000)+" km from the car, auto-start paused"
+            :"Back within 700 km of the car: auto-start on again");
+        stopTracking(); // no readings until the new mode is set up, e.g. while BYD is asked where the car is
+        startGps();
+        return true;
     }
     private static final float DRIVING_METRES_PER_SECOND=7; // 25 km/h
     /** A car check is running, and when the last one ended (elapsed time), so checks are spaced out. */
@@ -173,10 +220,10 @@ public final class MonitorService extends Service {
      */
     private void carChecked(double[] car,String reading) {
         checking=false; lastCheck=SystemClock.elapsedRealtime();
-        if(stopped) return;
+        if(stopped || AppRuntime.abroad(this).on) return;
         long moved=Math.round(ProximityGate.metres(car[0],car[1],carLatitude,carLongitude));
         boolean drove=moved>rearmMetres, wasArmed=proximity.armed();
-        if(drove) { carLatitude=car[0]; carLongitude=car[1]; }
+        if(drove) { carLatitude=car[0]; carLongitude=car[1]; AppRuntime.saveCar(this,carLatitude,carLongitude); }
         proximity.carChecked(drove);
         AppRuntime.prefs(this).edit().putBoolean("gateArmed",proximity.armed()).commit();
         if(drove) AppRuntime.proximityEvent(this,"Car moved "+moved+" m: following it");
@@ -257,9 +304,7 @@ public final class MonitorService extends Service {
     @Override public void onDestroy() {
         stopped=true;
         handler.removeCallbacksAndMessages(null);
-        if(fusedListener!=null) locations.removeUpdates(fusedListener);
-        if(satelliteListener!=null) locations.removeUpdates(satelliteListener);
-        if(connectivity!=null) connectivity.unregisterNetworkCallback(wifiCallback);
+        stopTracking();
         try {
             if(scanner!=null && (Build.VERSION.SDK_INT<31 || checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN)==PackageManager.PERMISSION_GRANTED))
                 scanner.stopScan(callback);

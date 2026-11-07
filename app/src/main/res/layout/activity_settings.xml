@@ -102,6 +102,12 @@
             <TextView style="@style/Body" android:text="@string/wifi_signal_hint" android:textSize="13sp" />
         </LinearLayout>
 
+        <LinearLayout style="@style/Card">
+            <Switch android:id="@+id/abroad" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium" android:text="@string/abroad_title" android:textColor="@color/on_surface" android:textSize="16sp" />
+            <TextView style="@style/Body" android:text="@string/abroad_body" />
+        </LinearLayout>
+
         <TextView style="@style/SectionHeader" android:text="@string/section_more" />
         <LinearLayout style="@style/Card">
             <TextView style="@style/CardTitle" android:text="@string/beacon_title" />
