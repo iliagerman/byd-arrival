@@ -62,6 +62,7 @@ public class CoreTest {
         check(Actions.expand(List.of("START", "OPENAIR"), customs).equals(List.of("START")), "only the first A/C start runs");
         check(Actions.expand(List.of("CLOSEAIR"), customs).equals(List.of("CLOSEAIR")), "turn off sends A/C off only");
         check(Actions.arrival("START", customs).equals(List.of("OPENDOOR", "START")), "auto-start unlocks first, then starts");
+        check(Actions.arrival(Actions.DEFAULT_ARRIVAL, customs).equals(List.of("OPENDOOR", "START")), "by default, arriving unlocks and starts the car");
         check(Actions.arrival("C1", customs).equals(List.of("OPENDOOR", "C1")), "auto-start unlocks before a custom action");
         check(Actions.arrival("C2", customs).equals(List.of("C2")), "a custom action that unlocks keeps its own order");
         check(Actions.arrival("OPENDOOR", customs).equals(List.of("OPENDOOR")), "auto-start set to Unlock unlocks once");

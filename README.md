@@ -107,9 +107,9 @@ Settings → **Custom actions** → **New custom action**. Give it a name and ti
 
 ### Auto-start near the car
 
-This unlocks the car when your phone comes close to the parked car, so you can get in and drive. It's off until you start it. The walkthrough after your first login covers the setup, or you can do it yourself under Settings → **AUTOMATION**:
+This unlocks and starts the car when your phone comes close to the parked car. It's off until you start it. The walkthrough after your first login covers the setup, or you can do it yourself under Settings → **AUTOMATION**:
 
-1. Choose what **When you arrive, run** (default: Unlock). It always unlocks the doors first; if your custom action already includes Unlock, it runs in your order instead. Keep it on Unlock if you drive without the key: Start car and A/C on put the car in remote mode, and BYD then asks for the key before you can drive, even after another unlock (the official app's unlock too). With the car off, an unlock lets you start it yourself.
+1. Choose what **When you arrive, run** (default: Start car). It always unlocks the doors first; if your custom action already includes Unlock, it runs in your order instead. Choose Unlock if you drive without the key: Start car and A/C on put the car in remote mode, and BYD then asks for the key before you can drive, even after another unlock (the official app's unlock too). With the car off, an unlock lets you start it yourself.
 2. Set the distances and timing:
    - **Start the car when within:** default 15 m.
    - **Re-arm after getting further than:** default 20 m.
@@ -117,7 +117,7 @@ This unlocks the car when your phone comes close to the parked car, so you can g
    - **Check every:** default 5 seconds. How often the app measures your distance, or scans for the Bluetooth beacon. Shorter reacts sooner but uses more battery. Android can deliver location readings less often than asked, especially indoors.
 3. Tap **Start monitoring**. The app reads the car's position, then follows your phone's location.
 4. Choose **When you walk away, run** (default: Close & lock), or Nothing to turn it off.
-5. Walk away. The next time you come within the start distance, the car unlocks.
+5. Walk away. The next time you come within the start distance, the car unlocks and the action runs.
 
 You can't save values that don't work together, because the app adjusts them for you and shows the result:
 

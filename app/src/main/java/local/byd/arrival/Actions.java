@@ -101,6 +101,8 @@ public final class Actions {
         }
         return steps;
     }
+    /** What auto-start runs unless you choose otherwise: Start car, after the unlock every arrival gets. */
+    public static final String DEFAULT_ARRIVAL = "START";
     /**
      * What auto-start sends: Unlock first, so you can get in even if the chosen action then fails,
      * followed by the chosen action. An action that already unlocks keeps its own order.

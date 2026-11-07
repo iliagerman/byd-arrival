@@ -18,10 +18,10 @@ final class AppRuntime {
     static List<Actions.Custom> customs(Context c) { return Actions.parse(prefs(c).getString("customActions","[]")); }
     static void setCustoms(Context c,List<Actions.Custom> customs) { prefs(c).edit().putString("customActions",Actions.toJson(customs)).apply(); }
     /**
-     * What the proximity trigger runs. Default: Unlock only. A remote A/C start puts the car in remote mode, and BYD
-     * then asks for the key before you can drive, even after another unlock.
+     * What the proximity trigger runs after unlocking. Default: Start car. That puts the car in remote mode, where BYD
+     * asks for the key before you can drive, even after another unlock; Unlock alone avoids that.
      */
-    static String arrivalAction(Context c) { return prefs(c).getString("arrivalAction","OPENDOOR"); }
+    static String arrivalAction(Context c) { return prefs(c).getString("arrivalAction",Actions.DEFAULT_ARRIVAL); }
     /** What runs when you walk away after an auto-start. Default: Close & lock. Empty: nothing. */
     static String leaveAction(Context c) { return prefs(c).getString("leaveAction","SECURE"); }
     /** Widget buttons, in order (up to ten). Older versions kept a separate main button; it becomes the first button. */
