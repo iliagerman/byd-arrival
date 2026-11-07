@@ -72,12 +72,20 @@ public final class BydApi {
      */
     private synchronized Object request(String endpoint, Map<String,String> inner) throws Exception {
         try { return send(endpoint,inner); }
-        catch(SessionEnded ended) {
-            if(inner.containsKey("random")) inner.put("random",random());
-            if(inner.containsKey("timeStamp")) inner.put("timeStamp",Long.toString(System.currentTimeMillis()));
-            return send(endpoint,inner);
-        }
+        catch(SessionEnded ended) { return send(endpoint,renewed(inner)); }
     }
+    /** A request sent again gets a new nonce and time, as a new request would. */
+    private static Map<String,String> renewed(Map<String,String> inner) {
+        if(inner.containsKey("random")) inner.put("random",random());
+        if(inner.containsKey("timeStamp")) inner.put("timeStamp",Long.toString(System.currentTimeMillis()));
+        return inner;
+    }
+    /** BYD's code for a car still busy with the previous command, e.g. windows still closing (pyBYD's 6024). */
+    static final class CarBusy extends IOException {
+        CarBusy() { super("BYD says the car is still busy with the previous command (code 6024). Tried 3 times; no further retry."); }
+    }
+    /** Wait before asking a busy car again, as pyBYD does. Tests set it to 0. */
+    static long busyWaitMs=5000;
     /** BYD's codes for an ended session, as in pyBYD. */
     private static final Set<String> SESSION_ENDED=Set.of("1002","1005","1010");
     static final class SessionEnded extends IOException {
@@ -229,7 +237,7 @@ public final class BydApi {
         Map<String,String> inner=base(vin);
         inner.put("commandPwd",Crypto.md5(pin)); inner.put("commandType",command);
         if (params!=null) inner.put("controlParamsMap",json(params));
-        JSONObject accepted=(JSONObject)request("/control/remoteControl",inner);
+        JSONObject accepted=trigger(inner);
         if (finished(accepted)) return;
         String serial=accepted.optString("requestSerial");
         if (serial.isEmpty()) throw new IOException("Command result unknown (no request serial); check car before retrying");
@@ -241,6 +249,20 @@ public final class BydApi {
             if (finished((JSONObject)request("/control/remoteControlResult",poll))) return;
         }
         throw new IOException("Command result unknown; check car before retrying");
+    }
+    /**
+     * Sends the command. A car still busy with the previous one refuses it without acting (6024), so it's sent again
+     * after 5 seconds, up to 3 times, as pyBYD does. Any other refusal is never retried.
+     */
+    private JSONObject trigger(Map<String,String> inner) throws Exception {
+        for(int attempt=1;;attempt++) {
+            try { return (JSONObject)request("/control/remoteControl",inner); }
+            catch(CarBusy busy) {
+                if(attempt==3) throw busy;
+                Thread.sleep(busyWaitMs);
+                renewed(inner);
+            }
+        }
     }
     /** True on success, false while pending; throws on rejection. controlState 0/1/2 or res 1=pending, 2=success. */
     static boolean finished(JSONObject status) throws IOException, JSONException {
@@ -285,6 +307,7 @@ public final class BydApi {
             String code=String.valueOf(result.get("code"));
             if(!code.equals("0")) {
                 if(SESSION_ENDED.contains(code)) { token=null; throw new SessionEnded(code); }
+                if(code.equals("6024")) throw new CarBusy();
                 if(Set.of("1003","1004").contains(code)) token=null;
                 throw new IOException("BYD API rejected request (code "+(code.matches("[0-9]+")?code:"unknown")+"); no retry");
             }

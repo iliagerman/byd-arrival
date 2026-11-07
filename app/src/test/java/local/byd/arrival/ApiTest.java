@@ -10,7 +10,7 @@ import java.nio.charset.StandardCharsets;
 /** In-memory HTTPS fixture. Uses synthetic credentials; never contacts BYD. */
 public final class ApiTest {
     static Bangcle cipher;
-    static int triggers,polls,checks,logins,sessionEnds;
+    static int triggers,polls,checks,logins,sessionEnds,busy;
     static boolean reject;
     static final String USER="fixture@example.invalid", PASS="synthetic-password", PIN="123456";
     static void check(boolean ok,String text) { checks++;if(!ok)throw new AssertionError(text); }
@@ -33,9 +33,15 @@ public final class ApiTest {
         api.command("SYNTHETICVIN","OPENAIR",BydApi.climateParams(21,17,5,30));
         check(logins==before+1,"a session ended by a login elsewhere signs in again by itself");
         check(triggers==3,"the command BYD refused for the ended session is sent once more, once");
+        BydApi.busyWaitMs=0; busy=2;
+        api.command("SYNTHETICVIN","OPENAIR",BydApi.climateParams(21,17,5,30));
+        check(triggers==6,"a car still busy with the last command (6024) is asked again until it accepts, as in pyBYD");
+        busy=3;
+        try { api.command("SYNTHETICVIN","OPENAIR",BydApi.climateParams(21,17,5,30));throw new AssertionError("must give up"); }
+        catch(IOException expected) { check(triggers==9 && expected.getMessage().contains("6024"),"gives up after 3 tries and says the car is busy"); }
         before=logins; sessionEnds=2;
         try { api.command("SYNTHETICVIN","OPENAIR",BydApi.climateParams(21,17,5,30));throw new AssertionError("must give up"); }
-        catch(IOException expected) { check(logins==before+1 && triggers==3 && expected.getMessage().startsWith("BYD "),"signs in again only once, then reports why"); }
+        catch(IOException expected) { check(logins==before+1 && triggers==9 && expected.getMessage().startsWith("BYD "),"signs in again only once, then reports why"); }
         check(BydApi.finished(new JSONObject().put("res",2)),"immediate success needs no serial");
         check(!BydApi.finished(new JSONObject().put("controlState",0)),"controlState 0 is pending");
         try { BydApi.finished(new JSONObject().put("controlState",2));throw new AssertionError("must reject failure"); }
@@ -86,6 +92,7 @@ public final class ApiTest {
                         else if(endpoint.endsWith("remoteControl")) {
                             triggers++;
                             if(reject) return response(new JSONObject().put("code","5011"));
+                            if(busy>0) { busy--; return response(new JSONObject().put("code","6024")); }
                             check(inner.getString("commandType").equals("OPENAIR"),"climate command identifier");
                             JSONObject params=new JSONObject(inner.getString("controlParamsMap"));
                             check(params.getInt("remoteMode")==4,"immediate mode required");
