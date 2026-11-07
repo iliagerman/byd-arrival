@@ -107,6 +107,29 @@ public final class BydApi {
         if(onlySerial(data)) throw new IOException("BYD GPS not reported by car");
         return data;
     }
+    /**
+     * Read-only: asks the car for live data (battery level, range) and polls until the answer holds data, as pyBYD does.
+     * energyType 0 is an electric car; a hybrid would get its fuel fields zeroed, but its battery level still comes back.
+     */
+    public JSONObject realtime(String vin) throws Exception {
+        Map<String,String> ask=base(vin); ask.put("energyType","0"); ask.put("tboxVersion","3");
+        JSONObject data=(JSONObject)request("/vehicleInfo/vehicle/vehicleRealTimeRequest",ask);
+        for(int attempt=0;attempt<10 && !realtimeReady(data);attempt++) {
+            Thread.sleep(1500);
+            Map<String,String> poll=base(vin); poll.put("energyType","0"); poll.put("tboxVersion","3");
+            poll.put("requestSerial",data.optString("requestSerial"));
+            data=(JSONObject)request("/vehicleInfo/vehicle/vehicleRealTimeResult",poll);
+        }
+        if(!realtimeReady(data)) throw new IOException("BYD battery level not reported by car");
+        return data;
+    }
+    /** pyBYD's rule: the answer holds data once it has a report time or a range. */
+    static boolean realtimeReady(JSONObject data) { return data.optLong("time",0)>0 || data.optDouble("enduranceMileage",0)>0; }
+    /** Battery level in percent, or -1 when the car sent none (BYD uses -1 after the car wakes or sleeps deeply). */
+    static int batteryPercent(JSONObject data) {
+        double percent=data.optDouble("elecPercent",-1);
+        return percent<0?-1:(int)Math.round(percent);
+    }
     /** A GPS response holding only the correlation id means the car has not reported a fix yet. */
     private static boolean onlySerial(JSONObject data) { return data.length()==1 && data.has("requestSerial"); }
     /** Returns {latitude, longitude} of the car. */

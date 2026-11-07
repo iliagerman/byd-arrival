@@ -36,6 +36,7 @@ public final class MainActivity extends Activity implements SharedPreferences.On
         if(state==null) {
             firstRunChecks();
             Updates.schedule(this);
+            BatteryJob.schedule(this);
             Updates.offerOnLaunch(this);
         }
     }
@@ -61,6 +62,8 @@ public final class MainActivity extends Activity implements SharedPreferences.On
         super.onResume();
         buildTiles();
         AppRuntime.prefs(this).registerOnSharedPreferenceChangeListener(this);
+        // Opening the app (also by tapping the widget's top line) refreshes a battery level older than 5 minutes.
+        if(System.currentTimeMillis()-AppRuntime.prefs(this).getLong("batteryAt",0)>5*60000L) AppRuntime.refreshBattery(this,()->{});
         refresh();
     }
     @Override protected void onPause() {

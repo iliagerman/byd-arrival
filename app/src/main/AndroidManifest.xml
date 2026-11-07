@@ -27,6 +27,7 @@
         <activity android:name=".WelcomeActivity" android:exported="false" android:parentActivityName=".MainActivity" />
         <activity android:name=".SettingsActivity" android:exported="false" android:parentActivityName=".MainActivity" />
         <service android:name=".UpdateJob" android:exported="false" android:permission="android.permission.BIND_JOB_SERVICE" />
+        <service android:name=".BatteryJob" android:exported="false" android:permission="android.permission.BIND_JOB_SERVICE" />
         <service android:name=".CommandService" android:exported="false" android:foregroundServiceType="dataSync" />
         <service android:name=".MonitorService" android:exported="false" android:foregroundServiceType="location|connectedDevice" />
         <receiver android:name=".ArrivalWidget" android:exported="false">

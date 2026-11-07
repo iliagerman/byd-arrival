@@ -77,6 +77,7 @@ Long-press your home screen → Widgets → **BYD Arrival**, or use Settings →
 
 - Tap a button to run it. There's no PIN or password prompt, because the app uses your saved PIN.
 - A badge shows the result on the last button you pressed: grey `…` while running, green ✓ when BYD confirms, red ✗ if it failed. The notification has the full message.
+- The top line shows the car's battery level next to its name. The app reads it from the car every 30 minutes, after each command, and when you open the app (tapping the top line opens it) if the last reading is over 5 minutes old. Reading it sends nothing to the car.
 - The top line shows the auto-start state: a shield icon means armed, a ring means not armed. For example: `Armed · 31 m · 16:37:04`, or `Off` when monitoring is stopped.
 - To choose the buttons, go to Settings → **Widget** → **Choose buttons**. You can pick up to 10, with 5 per row, in the order you tick them. Custom actions can be included.
 

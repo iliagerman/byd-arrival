@@ -7,6 +7,9 @@
         <TextView android:id="@+id/w_title" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
             android:ellipsize="end" android:fontFamily="sans-serif-medium" android:maxLines="1" android:text="@string/my_car"
             android:textColor="@color/on_surface" android:textSize="14sp" />
+        <TextView android:id="@+id/w_battery" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginEnd="10dp" android:drawableStart="@drawable/ic_battery" android:drawablePadding="2dp" android:gravity="center_vertical"
+            android:maxLines="1" android:textColor="@color/on_surface" android:textSize="12sp" android:visibility="gone" />
         <ImageView android:id="@+id/w_prox_icon" android:layout_width="14dp" android:layout_height="14dp"
             android:importantForAccessibility="no" android:src="@drawable/ic_unarmed" />
         <TextView android:id="@+id/w_prox_text" android:layout_width="wrap_content" android:layout_height="wrap_content"

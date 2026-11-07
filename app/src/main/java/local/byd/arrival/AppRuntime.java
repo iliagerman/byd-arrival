@@ -191,6 +191,7 @@ final class AppRuntime {
                 List<String> notes=new ArrayList<>();
                 Routine.run(Actions.expand(actions,customs),step->runStep(c,client,vin,step,notes));
                 prefs(c).edit().putString("lastResult","ok").apply();
+                refreshBattery(c,()->{}); // the car is awake now, so its battery level is current
                 status(c,"Done: "+Actions.labels(actions,customs)+(notes.isEmpty()?"":" ("+String.join(", ",notes)+")")+". Confirmed by BYD.");
             } catch(Exception error) {
                 prefs(c).edit().putString("lastResult","fail").apply();
@@ -251,6 +252,26 @@ final class AppRuntime {
         failed.forEach((step,error)->lines.add(Actions.BUILT_IN.get(step)+": "+safeError(error)));
         boolean others=failed.size()<Actions.CLOSE_AND_LOCK.size();
         throw new IOException("Command failed in Close & lock. "+String.join(" ",lines)+(others?" The other steps were confirmed.":""));
+    }
+    /**
+     * Reads the car's battery level (read-only) for the widget, then runs done. A failure keeps the last level and is
+     * logged: the widget then shows the older level, which the next refresh replaces.
+     */
+    static void refreshBattery(Context context,Runnable done) {
+        Context c=context.getApplicationContext();
+        if(!ready(c)) { done.run(); return; }
+        IO.execute(()-> {
+            try {
+                int percent=BydApi.batteryPercent(api(c).realtime(prefs(c).getString("vin","")));
+                log(c,"battery: "+(percent<0?"not reported":percent+"%"));
+                if(percent>=0) prefs(c).edit().putInt("batteryPercent",percent).putLong("batteryAt",System.currentTimeMillis()).apply();
+            } catch(Exception error) {
+                clearSession();
+                log(c,"battery check failed: "+safeError(error));
+            }
+            ArrivalWidget.updateAll(c);
+            done.run();
+        });
     }
     /** The car reports -129 °C when it has no reading. */
     private static final int NO_READING=-129;

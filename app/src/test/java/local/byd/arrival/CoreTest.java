@@ -81,6 +81,11 @@ public class CoreTest {
         });
         check(sent.equals(List.of("CLOSEAIR", "CLOSEWINDOW", "LOCKDOOR")), "run-all keeps going after a failure, so the car still locks");
         check(failed.keySet().equals(Set.of("CLOSEAIR")), "run-all reports only the failed step");
+        org.json.JSONObject live = new org.json.JSONObject().put("elecPercent", 84.4).put("enduranceMileage", 355).put("time", 1794038744L);
+        check(BydApi.realtimeReady(live) && BydApi.batteryPercent(live) == 84, "live data gives the battery level, rounded");
+        check(!BydApi.realtimeReady(new org.json.JSONObject().put("requestSerial", "x")), "an answer holding only the request id isn't ready");
+        check(BydApi.batteryPercent(new org.json.JSONObject().put("elecPercent", -1)) == -1, "BYD's -1 means no battery level");
+        check(BydApi.batteryPercent(new org.json.JSONObject()) == -1, "a missing battery level is reported as none");
         ClimatePlan plan = ClimatePlan.defaults();
         check(plan.choose(16) == plan.freezing && plan.freezing.driverSeat && plan.freezing.temperature == 26, "below 17 °C: warm A/C and driver seat heat");
         check(plan.choose(17) == plan.cold && !plan.cold.driverSeat && plan.cold.temperature == 26, "17–20 °C: warm A/C, no seat heat");

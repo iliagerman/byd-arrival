@@ -40,6 +40,9 @@ public final class ArrivalWidget extends AppWidgetProvider {
         for(int id:ids) {
             RemoteViews views=new RemoteViews(context.getPackageName(),R.layout.arrival_widget);
             views.setTextViewText(R.id.w_title,prefs.getString("vehicleName",context.getString(R.string.my_car)));
+            int battery=prefs.getInt("batteryPercent",-1);
+            views.setViewVisibility(R.id.w_battery,battery<0?View.GONE:View.VISIBLE);
+            views.setTextViewText(R.id.w_battery,battery+"%");
             views.setImageViewResource(R.id.w_prox_icon,prefs.getBoolean("proximityArmed",false)?R.drawable.ic_armed:R.drawable.ic_unarmed);
             views.setTextViewText(R.id.w_prox_text,AppRuntime.proximityLabel(prefs));
             views.setOnClickPendingIntent(R.id.w_header,activity(context,21,MainActivity.class));
