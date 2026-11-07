@@ -131,6 +131,15 @@ final class AppRuntime {
      * Rolling log of location readings, events and statuses, without coordinates. Readable over ADB at
      * /sdcard/Android/data/local.byd.arrival/files/readings.log; the previous half MB is kept in readings.old.log.
      */
+    /** The last lines of the log, older file first, for sharing. */
+    static String logTail(Context c,int lines) throws IOException {
+        List<String> all=new ArrayList<>();
+        for(String name:List.of("readings.old.log","readings.log")) {
+            File file=new File(c.getExternalFilesDir(null),name);
+            if(file.exists()) all.addAll(java.nio.file.Files.readAllLines(file.toPath()));
+        }
+        return String.join("\n",all.subList(Math.max(0,all.size()-lines),all.size()));
+    }
     static void log(Context c,String line) {
         File dir=c.getExternalFilesDir(null), file=new File(dir,"readings.log");
         if(file.length()>512*1024 && !file.renameTo(new File(dir,"readings.old.log"))) android.util.Log.w("byd-arrival","Log rotation failed");

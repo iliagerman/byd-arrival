@@ -64,6 +64,7 @@ public final class SettingsActivity extends Activity {
         click(R.id.grant,()-> { if(Permissions.complete(this)) toast("All permissions are granted."); else Permissions.askNext(this); });
         click(R.id.forget,this::confirmForget);
         click(R.id.check_updates,()->Updates.checkNow(this));
+        click(R.id.share_log,this::shareLog);
         ((TextView)findViewById(R.id.app_version)).setText(getString(R.string.app_version,BuildConfig.VERSION_NAME));
     }
     @Override protected void onResume() { super.onResume(); refresh(); }
@@ -244,6 +245,16 @@ public final class SettingsActivity extends Activity {
         AppWidgetManager manager=getSystemService(AppWidgetManager.class);
         if(manager.isRequestPinAppWidgetSupported()) manager.requestPinAppWidget(new ComponentName(this,ArrivalWidget.class),null,null);
         else toast("Long-press the home screen → Widgets → BYD Arrival.");
+    }
+    /** Sends the last 600 log lines (distances, margins, events; no coordinates) wherever you choose, e.g. to yourself. */
+    private void shareLog() {
+        try {
+            Intent send=new Intent(Intent.ACTION_SEND).setType("text/plain")
+                .putExtra(Intent.EXTRA_SUBJECT,"BYD Arrival log").putExtra(Intent.EXTRA_TEXT,AppRuntime.logTail(this,600));
+            startActivity(Intent.createChooser(send,getString(R.string.share_log)));
+        } catch(java.io.IOException error) {
+            toast("Couldn't read the log: "+error.getMessage());
+        }
     }
     private void confirmForget() {
         new AlertDialog.Builder(this).setTitle("Forget credentials?")
