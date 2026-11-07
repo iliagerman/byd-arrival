@@ -100,7 +100,8 @@
     <string name="check_updates">Check for updates</string>
     <string name="share_log">Share log</string>
     <string name="abroad_title">Abroad mode</string>
-    <string name="abroad_body">Pauses auto-start and the app\'s background requests to BYD while you travel, so it doesn\'t keep retrying without a network. It turns on by itself when you\'re more than 700 km from the car, and off by itself once you\'re back within 700 km. Switch it on before a trip to pause it straight away. Widget buttons still work.</string>
+    <string name="abroad_body">Pauses auto-start and the app\'s background requests to BYD while you travel, so it doesn\'t keep retrying without a network. It turns on by itself when you\'re farther from the car than the distance below, and off by itself once you\'re back within it. Switch it on before a trip to pause it straight away. Widget buttons still work.</string>
+    <string name="abroad_km">Abroad from (km from the car, 100–5000)</string>
     <string name="add_widget">Add widget to home screen</string>
     <string name="battery">Battery optimisation settings</string>
     <string name="forget">Forget credentials</string>

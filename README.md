@@ -146,7 +146,7 @@ Phone location is often several metres off, and worse indoors. Very short distan
 
 ### Abroad mode
 
-Settings → **Abroad mode** pauses auto-start, car-position checks and the 30-minute battery reading while you travel, so the app doesn't keep asking BYD or retrying without a network. It turns on by itself when you're more than 700 km from the car, and off by itself once you're back within 700 km. Switch it on before a trip to pause it straight away; it still turns itself off when you come back. While it's on, the app reads your location roughly once every 15 minutes, only to notice you're back, and the widget shows `Abroad · 2345 km`. Widget buttons still work.
+Settings → **Abroad mode** pauses auto-start, car-position checks and the 30-minute battery reading while you travel, so the app doesn't keep asking BYD or retrying without a network. It turns on by itself when you're farther from the car than **Abroad from** (default 700 km, 100 to 5000 km), and off by itself once you're back within it. A new distance is saved when you leave Settings and applies straight away. Switch it on before a trip to pause it straight away; it still turns itself off when you come back. While it's on, the app reads your location roughly once every 15 minutes, only to notice you're back, and the widget shows `Abroad · 2345 km`. Widget buttons still work.
 
 ### Trusted Wi-Fi (home, office)
 

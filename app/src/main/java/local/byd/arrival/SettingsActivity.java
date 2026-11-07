@@ -70,7 +70,7 @@ public final class SettingsActivity extends Activity {
     }
     @Override protected void onResume() { super.onResume(); refresh(); }
     /** The Wi-Fi signal is read live by the monitor, so saving it on leaving takes effect without a restart. */
-    @Override protected void onPause() { stopScan(); saveWifiSignal(); super.onPause(); }
+    @Override protected void onPause() { stopScan(); saveWifiSignal(); saveAbroadKm(); super.onPause(); }
 
     private void refresh() {
         SharedPreferences prefs=AppRuntime.prefs(this);
@@ -251,12 +251,20 @@ public final class SettingsActivity extends Activity {
     private void bindAbroad() {
         Switch abroad=findViewById(R.id.abroad);
         abroad.setChecked(AppRuntime.abroad(this).on);
+        ((EditText)findViewById(R.id.abroad_km)).setText(String.valueOf(AppRuntime.abroadKm(this)));
         abroad.setOnCheckedChangeListener((view,on)-> {
             AppRuntime.setAbroad(this,new Abroad(on,false));
             android.content.SharedPreferences prefs=AppRuntime.prefs(this);
             if(prefs.getBoolean("monitoring",false) && "gps".equals(prefs.getString("monitorMode","gps"))) startMonitor("gps");
-            toast(on?"Abroad mode on. Auto-start is paused until you're back within 700 km of the car.":"Abroad mode off.");
+            toast(on?"Abroad mode on. Auto-start is paused until you're back within "+AppRuntime.abroadKm(this)+" km of the car.":"Abroad mode off.");
         });
+    }
+    /** Saved when you leave Settings; monitoring reads it on every reading. Anything entered becomes a working value. */
+    private void saveAbroadKm() {
+        EditText field=findViewById(R.id.abroad_km);
+        int km=AutoStartSettings.abroadKm(field.getText().toString());
+        AppRuntime.prefs(this).edit().putInt("abroadKm",km).apply();
+        field.setText(String.valueOf(km));
     }
     /** Sends the last 600 log lines (distances, margins, events; no coordinates) wherever you choose, e.g. to yourself. */
     private void shareLog() {

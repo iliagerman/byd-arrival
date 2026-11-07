@@ -43,6 +43,7 @@ final class AppRuntime {
     static int rearmMetres(Context c) { return prefs(c).getInt("rearmMetres",AutoStartSettings.DEFAULT_REARM); }
     static int cooldownMinutes(Context c) { return prefs(c).getInt("cooldownMinutes",AutoStartSettings.DEFAULT_MINUTES); }
     static Abroad abroad(Context c) { return new Abroad(prefs(c).getBoolean("abroad",false),prefs(c).getBoolean("abroadBeenFar",false)); }
+    static int abroadKm(Context c) { return prefs(c).getInt("abroadKm",AutoStartSettings.DEFAULT_ABROAD_KM); }
     static void setAbroad(Context c,Abroad state) { prefs(c).edit().putBoolean("abroad",state.on).putBoolean("abroadBeenFar",state.beenFar).apply(); }
     /** The car's last position read from BYD, kept so abroad mode can measure the distance without asking BYD. */
     static void saveCar(Context c,double latitude,double longitude) {

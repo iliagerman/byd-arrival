@@ -125,7 +125,7 @@ public final class MonitorService extends Service {
     }
     /**
      * Abroad: no auto-start, no car checks, no Wi-Fi arming. A rough reading every 15 minutes only tells when you're back
-     * within 700 km of the car's saved position. Without a saved position it waits until you switch it off.
+     * within the abroad distance of the car's saved position. Without a saved position it waits until you switch it off.
      */
     private void beginAbroad() {
         if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED) {
@@ -140,7 +140,7 @@ public final class MonitorService extends Service {
         LocationRequest rare=new LocationRequest.Builder(15*60000L).setQuality(LocationRequest.QUALITY_BALANCED_POWER_ACCURACY).build();
         fusedListener=this::onFix;
         locations.requestLocationUpdates(LocationManager.FUSED_PROVIDER,rare,getMainExecutor(),fusedListener);
-        AppRuntime.status(this,"Abroad mode: auto-start paused until you're back within 700 km of the car.");
+        AppRuntime.status(this,"Abroad mode: auto-start paused until you're back within "+AppRuntime.abroadKm(this)+" km of the car.");
     }
     /** Stops location readings and Wi-Fi arming, before switching between normal and abroad tracking. */
     private void stopTracking() {
@@ -178,14 +178,18 @@ public final class MonitorService extends Service {
         AppRuntime.proximityEvent(this,"Triggered at "+Math.round(metres)+" m");
         arrival();
     }
-    /** Crossing 700 km from the car switches between normal and abroad tracking. Returns true when it switched. */
+    /**
+     * Crossing the abroad distance (Settings, default 700 km) switches between normal and abroad tracking. It's read on
+     * every reading, so a new value applies straight away. Returns true when it switched.
+     */
     private boolean abroadChanged(double metres) {
-        Abroad state=AppRuntime.abroad(this), next=state.observe(metres);
+        int km=AppRuntime.abroadKm(this);
+        Abroad state=AppRuntime.abroad(this), next=state.observe(metres,km*1000.0);
         if(next.equals(state)) return false;
         AppRuntime.setAbroad(this,next);
         if(next.on==state.on) return false;
         AppRuntime.proximityEvent(this,next.on?"Abroad: "+Math.round(metres/1000)+" km from the car, auto-start paused"
-            :"Back within 700 km of the car: auto-start on again");
+            :"Back within "+km+" km of the car: auto-start on again");
         stopTracking(); // no readings until the new mode is set up, e.g. while BYD is asked where the car is
         startGps();
         return true;
