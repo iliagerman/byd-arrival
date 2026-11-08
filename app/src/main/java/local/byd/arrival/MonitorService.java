@@ -156,7 +156,7 @@ public final class MonitorService extends Service {
         if(metres>AppRuntime.restartKm(this)*1000.0) { impossibleDistance(metres); return; }
         boolean rough=fix.getAccuracy()>rearmMetres, late=age>30000;
         // Faster than walking you're in a vehicle (or running), not walking up to the car, so it never starts then.
-        boolean moving=fix.hasSpeed() && fix.getSpeed()>FASTER_THAN_WALKING;
+        boolean moving=ProximityGate.movingFast(fix.hasSpeed(),fix.getSpeed(),fix.getAccuracy(),rearmMetres);
         if(moving) { lastFastAt=SystemClock.elapsedRealtime(); onTrip=true; }
         // A reading delivered more than 30 s late can't start or arm anything. It's shown with its own time, so it looks stale.
         ProximityGate.Event event=late?ProximityGate.Event.NONE
@@ -243,7 +243,6 @@ public final class MonitorService extends Service {
         stopTracking(); // no readings until the car's position is read again
         startGps();
     }
-    private static final float FASTER_THAN_WALKING=3.5f; // about 12 km/h
     /** Your last location reading, for the log's car-position lines. */
     private volatile Location lastFix;
     /** For the log: how old BYD's car position was and how far it was from your last reading. Never coordinates. */

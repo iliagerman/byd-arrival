@@ -61,6 +61,13 @@ public final class ProximityGate {
         if(movingFast || followOnly) return CarCheck.UNSURE;
         return wereAtCar?CarCheck.WALKED_AWAY:CarCheck.AWAY;
     }
+    /**
+     * Faster than walking (about 12 km/h): in a vehicle, or running. Speed counts only from a reading accurate enough
+     * to use (within the re-arm distance): indoors GPS reports noise such as 17 km/h at ±235 m.
+     */
+    public static boolean movingFast(boolean hasSpeed,float metresPerSecond,float accuracyMetres,double rearmMetres) {
+        return hasSpeed && metresPerSecond>3.5f && accuracyMetres<=rearmMetres;
+    }
     /** Before unlocking on arrival: BYD's position for the car must be within the start distance of you, plus 30 m of GPS error. */
     public static boolean carIsHere(double phoneToCarMetres,double fireMetres) { return phoneToCarMetres<=fireMetres+30; }
     /**
