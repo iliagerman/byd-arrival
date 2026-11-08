@@ -66,6 +66,7 @@ public final class SettingsActivity extends Activity {
         click(R.id.forget,this::confirmForget);
         click(R.id.check_updates,()->Updates.checkNow(this));
         click(R.id.share_log,this::shareLog);
+        click(R.id.save_log,this::saveLog);
         ((TextView)findViewById(R.id.app_version)).setText(getString(R.string.app_version,BuildConfig.VERSION_NAME));
     }
     @Override protected void onResume() { super.onResume(); refresh(); }
@@ -265,6 +266,20 @@ public final class SettingsActivity extends Activity {
         int km=AutoStartSettings.restartKm(field.getText().toString());
         AppRuntime.prefs(this).edit().putInt("abroadKm",km).apply();
         field.setText(String.valueOf(km));
+    }
+    /** Saves the whole log (about 40 hours) as one text file in Downloads, to attach wherever you like. */
+    private void saveLog() {
+        String name="byd-arrival-log-"+android.text.format.DateFormat.format("yyyyMMdd-HHmm",System.currentTimeMillis())+".txt";
+        ContentValues values=new ContentValues();
+        values.put(android.provider.MediaStore.Downloads.DISPLAY_NAME,name);
+        values.put(android.provider.MediaStore.Downloads.MIME_TYPE,"text/plain");
+        Uri file=getContentResolver().insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI,values);
+        try(java.io.OutputStream out=getContentResolver().openOutputStream(file)) {
+            for(java.io.File part:AppRuntime.logFiles(this)) out.write(java.nio.file.Files.readAllBytes(part.toPath()));
+            toast("Saved "+name+" to Downloads.");
+        } catch(java.io.IOException error) {
+            toast("Couldn't save the log: "+error.getMessage());
+        }
     }
     /** Sends the last 600 log lines (distances, margins, events; no coordinates) wherever you choose, e.g. to yourself. */
     private void shareLog() {

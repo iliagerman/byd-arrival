@@ -29,9 +29,11 @@ public final class ApiTest {
         try { api.command("SYNTHETICVIN","OPENDOOR",null);throw new AssertionError("must reject PIN error"); }
         catch(IOException expected) { check(expected.getMessage().contains("5011"),"numeric error only"); }
         check(triggers==2,"rejected command not retried");
+        String[] endedCode={""}; api.onSessionEnded=code->endedCode[0]=code;
         reject=false; int before=logins; sessionEnds=1;
         api.command("SYNTHETICVIN","OPENAIR",BydApi.climateParams(21,17,5,30));
         check(logins==before+1,"a session ended by a login elsewhere signs in again by itself");
+        check(endedCode[0].equals("1005"),"an ended session is reported, so the log shows when another device signed in");
         check(triggers==3,"the command BYD refused for the ended session is sent once more, once");
         BydApi.busyWaitMs=0; busy=2;
         api.command("SYNTHETICVIN","OPENAIR",BydApi.climateParams(21,17,5,30));
@@ -48,6 +50,9 @@ public final class ApiTest {
         catch(IOException expected) { check(true,"controlState 2 is rejection"); }
         double[] at=BydApi.position(new JSONObject().put("data",new JSONObject().put("latitude",32.1).put("longitude",34.8)));
         check(at[0]==32.1 && at[1]==34.8,"car position read from nested GPS data");
+        double[] stamped=BydApi.position(new JSONObject().put("data",new JSONObject().put("latitude",32.1).put("longitude",34.8).put("gpsTimeStamp",1794156502L)));
+        check(stamped[2]==1794156502,"the car position carries BYD's report time, so the log can show how old it was");
+        check(at[2]==0,"a position without a report time says so with 0");
         try { BydApi.position(new JSONObject().put("data",new JSONObject().put("latitude",0).put("longitude",0)));throw new AssertionError("must reject 0,0"); }
         catch(IOException expected) { check(expected.getMessage().startsWith("BYD "),"0,0 is no position, and the reason is shown to the user"); }
         JSONObject none=new JSONObject().put("data",new JSONObject().put("latitude",0).put("longitude",0));

@@ -99,6 +99,7 @@
     <string name="app_version">Version %1$s</string>
     <string name="check_updates">Check for updates</string>
     <string name="share_log">Share log</string>
+    <string name="save_log">Save log to Downloads</string>
     <string name="abroad_title">Abroad mode</string>
     <string name="far_title">Distance check and abroad mode</string>
     <string name="far_body">In Israel the car is never this far away, so a reading beyond this distance means the car\'s position or your phone\'s location was read wrong. The reading is ignored and tracking restarts: the car\'s position is read from BYD again and your location readings start afresh, at most every 5 minutes. Israel is about 420 km long, so 450 catches more wrong readings.</string>

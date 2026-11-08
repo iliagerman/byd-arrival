@@ -72,7 +72,10 @@ public final class BydApi {
      */
     private synchronized Object request(String endpoint, Map<String,String> inner) throws Exception {
         try { return send(endpoint,inner); }
-        catch(SessionEnded ended) { return send(endpoint,renewed(inner)); }
+        catch(SessionEnded ended) {
+            onSessionEnded.accept(ended.code);
+            return send(endpoint,renewed(inner));
+        }
     }
     /** A request sent again gets a new nonce and time, as a new request would. */
     private static Map<String,String> renewed(Map<String,String> inner) {
@@ -88,8 +91,11 @@ public final class BydApi {
     static long busyWaitMs=5000;
     /** BYD's codes for an ended session, as in pyBYD. */
     private static final Set<String> SESSION_ENDED=Set.of("1002","1005","1010");
+    /** Told each time BYD ended the session and the request is sent again after a new sign-in, e.g. to log it. */
+    java.util.function.Consumer<String> onSessionEnded=code->{};
     static final class SessionEnded extends IOException {
-        SessionEnded(String code) { super("BYD ended the session (code "+code+"), probably because the account signed in elsewhere. Try again."); }
+        final String code;
+        SessionEnded(String code) { super("BYD ended the session (code "+code+"), probably because the account signed in elsewhere. Try again."); this.code=code; }
     }
     private Object send(String endpoint, Map<String,String> inner) throws Exception {
         if (token==null || System.currentTimeMillis()-authenticatedAt>12*3600000L) login();
@@ -183,7 +189,7 @@ public final class BydApi {
         double lat=coordinate(source,"latitudeDone","latitude");
         double lon=coordinate(source,"longitudeDone","longitude");
         if(lat==0 && lon==0) throw new NoPosition();
-        return new double[]{lat,lon};
+        return new double[]{lat,lon,source.optLong("gpsTimeStamp",0)};
     }
     private static double coordinate(JSONObject source,String primary,String fallback) throws IOException {
         Object raw=source.opt(primary); if(raw==null) raw=source.opt(fallback);

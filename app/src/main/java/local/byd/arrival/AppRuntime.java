@@ -89,6 +89,7 @@ final class AppRuntime {
             try(InputStream stream=c.getAssets().open("bangcle_tables.bin")) {
                 api=new BydApi(stream.readAllBytes(),credentials.getString("username"),credentials.getString("password"),credentials.getString("pin"),
                     Regions.host(server(c)),country(c),TimeZone.getDefault().getID());
+                api.onSessionEnded=code->log(c,"BYD ended the session (code "+code+"), probably a sign-in on another device; signed in again");
             }
         }
         return api;
@@ -141,6 +142,15 @@ final class AppRuntime {
         prefs(c).edit().putString("proximityEvent",text+" · "+android.text.format.DateFormat.format("HH:mm:ss",System.currentTimeMillis())).apply();
         log(c,"event: "+text);
     }
+    /** The log files, older first. */
+    static List<File> logFiles(Context c) {
+        List<File> files=new ArrayList<>();
+        for(String name:List.of("readings.old.log","readings.log")) {
+            File file=new File(c.getExternalFilesDir(null),name);
+            if(file.exists()) files.add(file);
+        }
+        return files;
+    }
     /** The last lines of the log, older file first, for sharing. */
     static String logTail(Context c,int lines) throws IOException {
         List<String> all=new ArrayList<>();
@@ -152,11 +162,11 @@ final class AppRuntime {
     }
     /**
      * Rolling log of location readings, events and statuses, without coordinates. Readable over ADB at
-     * /sdcard/Android/data/local.byd.arrival/files/readings.log; the previous half MB is kept in readings.old.log.
+     * /sdcard/Android/data/local.byd.arrival/files/readings.log; the previous 2 MB is kept in readings.old.log (about 40 hours in all).
      */
     static void log(Context c,String line) {
         File dir=c.getExternalFilesDir(null), file=new File(dir,"readings.log");
-        if(file.length()>512*1024 && !file.renameTo(new File(dir,"readings.old.log"))) android.util.Log.w("byd-arrival","Log rotation failed");
+        if(file.length()>2*1024*1024 && !file.renameTo(new File(dir,"readings.old.log"))) android.util.Log.w("byd-arrival","Log rotation failed");
         try(FileWriter out=new FileWriter(file,true)) {
             out.write(android.text.format.DateFormat.format("MM-dd HH:mm:ss",System.currentTimeMillis())+" "+line+"\n");
         } catch(IOException error) {

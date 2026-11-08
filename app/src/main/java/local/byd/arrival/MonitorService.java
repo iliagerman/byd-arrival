@@ -84,6 +84,7 @@ public final class MonitorService extends Service {
         AppRuntime.IO.execute(()-> {
             try {
                 double[] at=AppRuntime.api(this).location(AppRuntime.prefs(this).getString("vin",""));
+                logCarPosition("monitoring started",at);
                 handler.post(()->beginGps(at));
             } catch(Exception error) {
                 AppRuntime.clearSession();
@@ -145,6 +146,7 @@ public final class MonitorService extends Service {
     }
     /** Saves the disarmed state before any start, so a restart cannot repeat a start. */
     private void onFix(Location fix) {
+        lastFix=fix;
         long age=(SystemClock.elapsedRealtimeNanos()-fix.getElapsedRealtimeNanos())/1000000;
         double metres=ProximityGate.metres(fix.getLatitude(),fix.getLongitude(),carLatitude,carLongitude);
         if(metres>AppRuntime.restartKm(this)*1000.0) { impossibleDistance(metres); return; }
@@ -187,6 +189,15 @@ public final class MonitorService extends Service {
         startGps();
     }
     private static final float FASTER_THAN_WALKING=3.5f; // about 12 km/h
+    /** Your last location reading, for the log's car-position lines. */
+    private volatile Location lastFix;
+    /** For the log: how old BYD's car position was and how far it was from your last reading. Never coordinates. */
+    private void logCarPosition(String why,double[] car) {
+        String age=car[2]>0?(System.currentTimeMillis()/1000-(long)car[2])+" s ago":"at an unknown time";
+        Location you=lastFix;
+        String apart=you==null?"":", "+Math.round(ProximityGate.metres(car[0],car[1],you.getLatitude(),you.getLongitude()))+" m from your last reading";
+        AppRuntime.log(this,"car position ("+why+"): reported "+age+apart);
+    }
     /** A car check is running, and when the last one ended (elapsed time), so checks are spaced out. */
     private boolean checking;
     private long lastCheck;
@@ -200,6 +211,7 @@ public final class MonitorService extends Service {
         AppRuntime.IO.execute(()-> {
             try {
                 double[] car=AppRuntime.api(this).location(AppRuntime.prefs(this).getString("vin",""));
+                logCarPosition("car check",car);
                 handler.post(()->carChecked(car,reading));
             } catch(Exception error) {
                 AppRuntime.clearSession();
