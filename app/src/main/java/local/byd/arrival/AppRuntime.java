@@ -42,10 +42,15 @@ final class AppRuntime {
     static int fireMetres(Context c) { return prefs(c).getInt("fireMetres",AutoStartSettings.DEFAULT_START); }
     static int rearmMetres(Context c) { return prefs(c).getInt("rearmMetres",AutoStartSettings.DEFAULT_REARM); }
     static int cooldownMinutes(Context c) { return prefs(c).getInt("cooldownMinutes",AutoStartSettings.DEFAULT_MINUTES); }
-    static Abroad abroad(Context c) { return new Abroad(prefs(c).getBoolean("abroad",false),prefs(c).getBoolean("abroadBeenFar",false)); }
-    static int abroadKm(Context c) { return prefs(c).getInt("abroadKm",AutoStartSettings.DEFAULT_ABROAD_KM); }
-    static void setAbroad(Context c,Abroad state) { prefs(c).edit().putBoolean("abroad",state.on).putBoolean("abroadBeenFar",state.beenFar).apply(); }
-    /** The car's last position read from BYD, kept so abroad mode can measure the distance without asking BYD. */
+    /**
+     * Tracking pauses in two ways. Beyond the pause distance from the car (farFromCar) it pauses by itself and restarts
+     * once you're back within it. Abroad mode, switched by hand, pauses it and suppresses that restart until switched off.
+     * Paused, there's no auto-start, no car check, no background battery reading and no retry.
+     */
+    static boolean trackingPaused(Context c) { return prefs(c).getBoolean("abroad",false) || prefs(c).getBoolean("farFromCar",false); }
+    /** Saved under "abroadKm", its first name. */
+    static int pauseKm(Context c) { return prefs(c).getInt("abroadKm",AutoStartSettings.DEFAULT_PAUSE_KM); }
+    /** The car's last position read from BYD, kept so a pause can measure the distance without asking BYD. */
     static void saveCar(Context c,double latitude,double longitude) {
         prefs(c).edit().putString("carLatitude",Double.toString(latitude)).putString("carLongitude",Double.toString(longitude)).apply();
     }
@@ -171,7 +176,7 @@ final class AppRuntime {
         if(distance.equals("Off")) return distance;
         long at=p.getLong("proximityAt",0);
         String time=android.text.format.DateFormat.format("HH:mm:ss",at).toString();
-        if(distance.startsWith("Abroad")) return distance+" · "+time;
+        if(distance.startsWith("Abroad") || distance.startsWith("Paused")) return distance+" · "+time;
         if(System.currentTimeMillis()-at>10*60000L) return "No reading since "+time;
         return (p.getBoolean("proximityArmed",false)?"Armed":"Not armed")+" · "+distance+" · "+time;
     }

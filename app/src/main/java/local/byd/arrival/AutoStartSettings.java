@@ -2,7 +2,7 @@ package local.byd.arrival;
 
 /** Auto-start distances and timing. Whatever is entered becomes a working set, so nobody is stopped by an error. */
 public final class AutoStartSettings {
-    public static final int DEFAULT_START=15, DEFAULT_REARM=20, DEFAULT_MINUTES=5, DEFAULT_WIFI_SIGNAL=-70, DEFAULT_SECONDS=5, DEFAULT_ABROAD_KM=700;
+    public static final int DEFAULT_START=15, DEFAULT_REARM=20, DEFAULT_MINUTES=5, DEFAULT_WIFI_SIGNAL=-70, DEFAULT_SECONDS=5, DEFAULT_PAUSE_KM=700;
     /** From this check interval on, the Bluetooth scan runs in short rounds instead of nonstop. */
     public static final int SCAN_ROUNDS_FROM_SECONDS=10;
     private static final int MIN_START=3, MAX_REARM=500, MIN_GAP=5, MIN_MINUTES=1, MAX_MINUTES=60;
@@ -23,8 +23,8 @@ public final class AutoStartSettings {
         return -clamp(number(digits,-DEFAULT_WIFI_SIGNAL),-STRONGEST_WIFI_SIGNAL,-WEAKEST_WIFI_SIGNAL);
     }
     /** How often, in seconds, to read the phone's location or scan for the beacon: 1 to 60. Blank or unreadable uses the default. */
-    /** Beyond this many km from the car, abroad mode turns on by itself: 100 to 5000. Blank or unreadable uses 700. */
-    public static int abroadKm(String text) { return clamp(number(text,DEFAULT_ABROAD_KM),100,5000); }
+    /** Beyond this many km from the car, tracking pauses by itself: 100 to 5000. Blank or unreadable uses 700. */
+    public static int pauseKm(String text) { return clamp(number(text,DEFAULT_PAUSE_KM),100,5000); }
     public static int intervalSeconds(String text) { return clamp(number(text,DEFAULT_SECONDS),1,60); }
     /**
      * How long the beacon must be out of range before you count as having left: 60 s, or two scan rounds when

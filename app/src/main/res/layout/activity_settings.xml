@@ -103,11 +103,13 @@
         </LinearLayout>
 
         <LinearLayout style="@style/Card">
-            <Switch android:id="@+id/abroad" android:layout_width="match_parent" android:layout_height="wrap_content"
+            <TextView style="@style/CardTitle" android:text="@string/far_title" />
+            <TextView style="@style/Body" android:text="@string/far_body" />
+            <TextView style="@style/FieldLabel" android:text="@string/pause_km" />
+            <EditText android:id="@+id/pause_km" style="@style/Field" android:layout_marginTop="4dp" android:inputType="number" android:maxLength="4" />
+            <Switch android:id="@+id/abroad" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp"
                 android:fontFamily="sans-serif-medium" android:text="@string/abroad_title" android:textColor="@color/on_surface" android:textSize="16sp" />
             <TextView style="@style/Body" android:text="@string/abroad_body" />
-            <TextView style="@style/FieldLabel" android:text="@string/abroad_km" />
-            <EditText android:id="@+id/abroad_km" style="@style/Field" android:layout_marginTop="4dp" android:inputType="number" android:maxLength="4" />
         </LinearLayout>
 
         <TextView style="@style/SectionHeader" android:text="@string/section_more" />

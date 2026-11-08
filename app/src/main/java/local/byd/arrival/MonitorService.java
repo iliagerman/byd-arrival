@@ -71,9 +71,10 @@ public final class MonitorService extends Service {
         }
         return START_STICKY;
     }
-    /** GPS mode first reads the car's position from BYD, then tracks the phone against it. Abroad, BYD isn't asked. */
+    /** GPS mode first reads the car's position from BYD, then tracks the phone against it. Paused, BYD isn't asked. */
     private void startGps() {
-        if(AppRuntime.abroad(this).on) { beginAbroad(); return; }
+        if(AppRuntime.prefs(this).getBoolean("abroad",false)) { beginAbroad(); return; }
+        if(AppRuntime.prefs(this).getBoolean("farFromCar",false)) { beginFar(); return; }
         AppRuntime.note(this,"Finding the car's position…");
         AppRuntime.IO.execute(()-> {
             try {
@@ -123,26 +124,31 @@ public final class MonitorService extends Service {
         connectivity.registerNetworkCallback(new NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build(),wifiCallback);
         AppRuntime.status(this,"Location monitoring on.");
     }
-    /**
-     * Abroad: no auto-start, no car checks, no Wi-Fi arming. A rough reading every 15 minutes only tells when you're back
-     * within the abroad distance of the car's saved position. Without a saved position it waits until you switch it off.
-     */
+    /** Abroad mode, switched on by hand: nothing is tracked or asked until it's switched off in Settings. */
     private void beginAbroad() {
+        stopTracking();
+        AppRuntime.setProximity(this,false,"Abroad mode",System.currentTimeMillis());
+        AppRuntime.status(this,"Abroad mode: auto-start paused until you switch it off in Settings.");
+    }
+    /**
+     * Beyond the pause distance: no auto-start, no car checks, no Wi-Fi arming. A rough reading every 15 minutes only
+     * tells when you're back within it, measured to the car's position saved when monitoring last read it.
+     */
+    private void beginFar() {
         if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED) {
             stopWithStatus("Allow location for this app, then try again."); return;
         }
         stopTracking();
         double[] car=AppRuntime.savedCar(this);
-        AppRuntime.setProximity(this,false,"Abroad",System.currentTimeMillis());
-        if(car==null) { AppRuntime.status(this,"Abroad mode: auto-start paused. Switch it off in Settings when you're back."); return; }
         carLatitude=car[0]; carLongitude=car[1];
         locations=getSystemService(LocationManager.class);
         LocationRequest rare=new LocationRequest.Builder(15*60000L).setQuality(LocationRequest.QUALITY_BALANCED_POWER_ACCURACY).build();
         fusedListener=this::onFix;
         locations.requestLocationUpdates(LocationManager.FUSED_PROVIDER,rare,getMainExecutor(),fusedListener);
-        AppRuntime.status(this,"Abroad mode: auto-start paused until you're back within "+AppRuntime.abroadKm(this)+" km of the car.");
+        int km=AppRuntime.pauseKm(this);
+        AppRuntime.status(this,"Paused: you're more than "+km+" km from the car. Tracking restarts by itself once you're back within "+km+" km.");
     }
-    /** Stops location readings and Wi-Fi arming, before switching between normal and abroad tracking. */
+    /** Stops location readings and Wi-Fi arming, before switching between normal and paused tracking. */
     private void stopTracking() {
         if(fusedListener!=null) locations.removeUpdates(fusedListener);
         if(satelliteListener!=null) locations.removeUpdates(satelliteListener);
@@ -154,9 +160,9 @@ public final class MonitorService extends Service {
     private void onFix(Location fix) {
         long age=(SystemClock.elapsedRealtimeNanos()-fix.getElapsedRealtimeNanos())/1000000;
         double metres=ProximityGate.metres(fix.getLatitude(),fix.getLongitude(),carLatitude,carLongitude);
-        if(abroadChanged(metres)) return;
-        if(AppRuntime.abroad(this).on) {
-            AppRuntime.setProximity(this,false,"Abroad · "+Math.round(metres/1000)+" km",System.currentTimeMillis()-age);
+        if(farChanged(metres)) return;
+        if(AppRuntime.prefs(this).getBoolean("farFromCar",false)) {
+            AppRuntime.setProximity(this,false,"Paused · "+Math.round(metres/1000)+" km",System.currentTimeMillis()-age);
             return;
         }
         boolean rough=fix.getAccuracy()>rearmMetres, late=age>30000;
@@ -179,17 +185,16 @@ public final class MonitorService extends Service {
         arrival();
     }
     /**
-     * Crossing the abroad distance (Settings, default 700 km) switches between normal and abroad tracking. It's read on
-     * every reading, so a new value applies straight away. Returns true when it switched.
+     * Crossing the pause distance (Settings, default 700 km) pauses or restarts tracking. It's read on every reading, so
+     * a new value applies straight away. Returns true when it switched.
      */
-    private boolean abroadChanged(double metres) {
-        int km=AppRuntime.abroadKm(this);
-        Abroad state=AppRuntime.abroad(this), next=state.observe(metres,km*1000.0);
-        if(next.equals(state)) return false;
-        AppRuntime.setAbroad(this,next);
-        if(next.on==state.on) return false;
-        AppRuntime.proximityEvent(this,next.on?"Abroad: "+Math.round(metres/1000)+" km from the car, auto-start paused"
-            :"Back within "+km+" km of the car: auto-start on again");
+    private boolean farChanged(double metres) {
+        int km=AppRuntime.pauseKm(this);
+        boolean far=metres>km*1000.0;
+        if(far==AppRuntime.prefs(this).getBoolean("farFromCar",false)) return false;
+        AppRuntime.prefs(this).edit().putBoolean("farFromCar",far).apply();
+        AppRuntime.proximityEvent(this,far?"Paused: "+Math.round(metres/1000)+" km from the car"
+            :"Back within "+km+" km of the car: tracking restarted");
         stopTracking(); // no readings until the new mode is set up, e.g. while BYD is asked where the car is
         startGps();
         return true;
@@ -224,7 +229,7 @@ public final class MonitorService extends Service {
      */
     private void carChecked(double[] car,String reading) {
         checking=false; lastCheck=SystemClock.elapsedRealtime();
-        if(stopped || AppRuntime.abroad(this).on) return;
+        if(stopped || AppRuntime.trackingPaused(this)) return;
         long moved=Math.round(ProximityGate.metres(car[0],car[1],carLatitude,carLongitude));
         boolean drove=moved>rearmMetres, wasArmed=proximity.armed();
         if(drove) { carLatitude=car[0]; carLongitude=car[1]; AppRuntime.saveCar(this,carLatitude,carLongitude); }

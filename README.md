@@ -144,9 +144,12 @@ How it behaves:
 
 Phone location is often several metres off, and worse indoors. Very short distances may not work reliably.
 
-### Abroad mode
+### Far from the car, and abroad mode
 
-Settings → **Abroad mode** pauses auto-start, car-position checks and the 30-minute battery reading while you travel, so the app doesn't keep asking BYD or retrying without a network. It turns on by itself when you're farther from the car than **Abroad from** (default 700 km, 100 to 5000 km), and off by itself once you're back within it. A new distance is saved when you leave Settings and applies straight away. Switch it on before a trip to pause it straight away; it still turns itself off when you come back. While it's on, the app reads your location roughly once every 15 minutes, only to notice you're back, and the widget shows `Abroad · 2345 km`. Widget buttons still work.
+Tracking pauses in two ways. While it's paused there's no auto-start, no car-position check, no 30-minute battery reading and no retrying, so the app doesn't keep asking BYD, for example on a trip without a network. Widget buttons still work.
+
+- **By itself, far from the car.** Beyond **Pause beyond** (default 700 km, 100 to 5000 km) from the car, tracking pauses, and it restarts by itself once you're back within that distance. Meanwhile the app reads your location roughly once every 15 minutes, only to notice you're back, and the widget shows `Paused · 2345 km`. A new distance is saved when you leave Settings and applies straight away.
+- **By hand, abroad mode.** The **Abroad mode** switch pauses tracking straight away and suppresses the automatic restart: it stays paused, with no location readings at all, until you switch it off. The widget shows `Abroad mode`.
 
 ### Trusted Wi-Fi (home, office)
 
