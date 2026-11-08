@@ -19,6 +19,10 @@ public final class ProximityGate {
         this.armed = armed;
     }
     public boolean armed() { return armed; }
+    /** You were at the car (a reading within the re-arm distance of its spot) since its spot last changed. */
+    public boolean visited() { return visited; }
+    /** The car's spot changed without you: being near the old spot no longer counts as having been at the car. */
+    public void spotChanged() { visited=false; }
     /** Arms the trigger without a distance reading, e.g. when a trusted Wi-Fi is joined. */
     public void arm() { armed = true; }
     /**
@@ -38,18 +42,27 @@ public final class ProximityGate {
         visited = false;
     }
     /** What a car check means for the trigger. */
-    public enum CarCheck { MOVED, WALKED_AWAY, UNSURE }
+    public enum CarCheck { MOVED_WITH_YOU, MOVED_WITHOUT_YOU, WALKED_AWAY, AWAY, UNSURE }
+    /** The car counts as moving with you within this distance of your phone; BYD's position is a few seconds old. */
+    static final double WITH_YOU_METRES=300;
     /**
-     * MOVED: the car is more than the re-arm distance from its saved spot, so you drove it. WALKED_AWAY: it's still there
-     * and you're on foot. UNSURE: it's still there but you're moving faster than walking: you've just driven off and BYD's
-     * position lags, or you're in another vehicle. Neither is walking away, so UNSURE changes nothing.
-     * A follow-only check, at the end of a trip, can only say MOVED or UNSURE: two minutes still in traffic looks the
-     * same as having parked, so it never counts as walking away.
+     * Someone else may drive the car, so the car moving doesn't mean you drove it.
+     * MOVED_WITH_YOU: it moved more than the re-arm distance and is near you while you travel: you're in it.
+     * MOVED_WITHOUT_YOU: it moved, but you're not travelling with it: someone else drove it. Only its position changes.
+     * WALKED_AWAY: it's still at its spot and you're on foot, after having been at the car: you walked away from it.
+     * AWAY: the same, but you were never at the car: the trigger arms, but no walk-away action runs.
+     * UNSURE: it's still at its spot while you move faster than walking (you've just driven off and BYD lags, or you're
+     * in another vehicle), or a follow-only check (end of a trip, every 15 minutes) where traffic looks like parked.
      */
-    public static CarCheck carCheck(double movedMetres,double rearmMetres,boolean movingFast,boolean followOnly) {
-        if(movedMetres>rearmMetres) return CarCheck.MOVED;
-        return movingFast || followOnly?CarCheck.UNSURE:CarCheck.WALKED_AWAY;
+    public static CarCheck carCheck(double movedMetres,double rearmMetres,double phoneToCarMetres,boolean movingFast,
+                                    boolean travelling,boolean followOnly,boolean wereAtCar) {
+        if(movedMetres>rearmMetres)
+            return travelling && phoneToCarMetres<=WITH_YOU_METRES?CarCheck.MOVED_WITH_YOU:CarCheck.MOVED_WITHOUT_YOU;
+        if(movingFast || followOnly) return CarCheck.UNSURE;
+        return wereAtCar?CarCheck.WALKED_AWAY:CarCheck.AWAY;
     }
+    /** Before unlocking on arrival: BYD's position for the car must be within the start distance of you, plus 30 m of GPS error. */
+    public static boolean carIsHere(double phoneToCarMetres,double fireMetres) { return phoneToCarMetres<=fireMetres+30; }
     /**
      * How long to wait between car checks while you're in a vehicle: a minute, so even a short drive is followed. Each
      * UNSURE result in a row (the car stays put, e.g. you're on a bus) doubles it, up to 15 minutes.

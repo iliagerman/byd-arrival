@@ -145,13 +145,25 @@ public class CoreTest {
         check(home.observe(40, 5, true) == LEFT, "leaving the car while armed still checks whether you drove it");
         home.carChecked(true);
         check(!home.armed(), "drove off without a start: disarmed until you leave the car's new spot");
-        check(ProximityGate.carCheck(152, 20, true, false) == ProximityGate.CarCheck.MOVED, "car 152 m from its spot: you drove it");
-        check(ProximityGate.carCheck(5, 20, false, false) == ProximityGate.CarCheck.WALKED_AWAY, "car at its spot, you walking: you walked away");
-        check(ProximityGate.carCheck(9, 20, true, false) == ProximityGate.CarCheck.UNSURE,
+        // carCheck(moved from saved spot, re-arm, phone to car, moving fast now, travelling this trip, follow-only, were at the car)
+        check(ProximityGate.carCheck(152, 20, 30, true, true, false, false) == ProximityGate.CarCheck.MOVED_WITH_YOU,
+            "car moved and is 30 m from you while you travel: you're driving it");
+        check(ProximityGate.carCheck(2140, 20, 2515, true, true, false, false) == ProximityGate.CarCheck.MOVED_WITHOUT_YOU,
+            "car moved 2.1 km while 2.5 km from you: someone else drove it (seen 17:16), so only its position is updated");
+        check(ProximityGate.carCheck(1064, 20, 1055, false, false, true, false) == ProximityGate.CarCheck.MOVED_WITHOUT_YOU,
+            "car moved 1 km while you stayed home: someone else drove it (seen 10:13)");
+        check(ProximityGate.carCheck(2100, 20, 40, false, false, true, false) == ProximityGate.CarCheck.MOVED_WITHOUT_YOU,
+            "car brought back home while you're home, not travelling: someone else drove it, so no 'with the car'");
+        check(ProximityGate.carCheck(5, 20, 30, false, false, false, true) == ProximityGate.CarCheck.WALKED_AWAY,
+            "car at its spot, you on foot after being at the car: you walked away");
+        check(ProximityGate.carCheck(5, 20, 2203, false, false, false, false) == ProximityGate.CarCheck.AWAY,
+            "car at its spot, you away but never at the car: arm only, no walk-away (seen 17:18: it locked your wife's car)");
+        check(ProximityGate.carCheck(9, 20, 20, true, true, false, true) == ProximityGate.CarCheck.UNSURE,
             "car at its spot while you move at 26 km/h: just driven off with BYD lagging, never walking away (seen 08:06)");
-        check(ProximityGate.carCheck(800, 20, false, true) == ProximityGate.CarCheck.MOVED, "check at the end of a trip: the car moved, so follow it");
-        check(ProximityGate.carCheck(5, 20, false, true) == ProximityGate.CarCheck.UNSURE,
-            "check at the end of a trip only follows the car: still in traffic looks like parked, so it never arms");
+        check(ProximityGate.carCheck(5, 20, 30, false, true, true, true) == ProximityGate.CarCheck.UNSURE,
+            "follow-only check: still in traffic looks like parked, so it never arms");
+        check(ProximityGate.carIsHere(25, 15) && !ProximityGate.carIsHere(2100, 15),
+            "before unlocking on arrival, the car must really be within the start distance plus 30 m of you");
         check(ProximityGate.vehicleCheckGapMs(0) == 60_000, "in a vehicle, the car is checked every minute, so a 4-minute drive is followed");
         check(ProximityGate.vehicleCheckGapMs(1) == 120_000, "car still at its spot while you move: wait longer before asking again");
         check(ProximityGate.vehicleCheckGapMs(30) == 15 * 60_000, "on a long train ride, at most every 15 minutes");

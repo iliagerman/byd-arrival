@@ -112,6 +112,8 @@ public final class MonitorService extends Service {
         carLatitude=car[0]; carLongitude=car[1];
         AppRuntime.saveCar(this,carLatitude,carLongitude);
         lastCheck=SystemClock.elapsedRealtime();
+        handler.removeCallbacks(periodicCheck);
+        handler.postDelayed(periodicCheck,15*60_000L);
         android.content.SharedPreferences prefs=AppRuntime.prefs(this);
         fireMetres=AppRuntime.fireMetres(this); rearmMetres=AppRuntime.rearmMetres(this);
         proximity=new ProximityGate(fireMetres,rearmMetres,prefs.getBoolean("gateArmed",false));
@@ -158,7 +160,8 @@ public final class MonitorService extends Service {
         if(moving) { lastFastAt=SystemClock.elapsedRealtime(); onTrip=true; }
         // A reading delivered more than 30 s late can't start or arm anything. It's shown with its own time, so it looks stale.
         ProximityGate.Event event=late?ProximityGate.Event.NONE
-            :proximity.observe(metres,fix.getAccuracy(),cooldownPassed() && !onTrustedWifi() && !moving);
+            :proximity.observe(metres,fix.getAccuracy(),cooldownPassed() && !onTrustedWifi() && !moving
+                && !verifying && SystemClock.elapsedRealtime()>=verifyRetryAt);
         AppRuntime.log(this,fix.getProvider()+" "+Math.round(metres)+" m ±"+Math.round(fix.getAccuracy())+" m, "+age/1000+" s old"
             +(moving?", "+Math.round(fix.getSpeed()*3.6)+" km/h":"")+(event==ProximityGate.Event.NONE?"":", "+event));
         // Following the car, the distance to its last checked spot means nothing: you're in it.
@@ -174,11 +177,56 @@ public final class MonitorService extends Service {
         else if(onTrip && !late && SystemClock.elapsedRealtime()-lastFastAt>2*60_000 && checkCar(reading,0,true)) {
             onTrip=false; unsureInRow=0;
         }
-        if(event!=ProximityGate.Event.FIRE) return;
+        if(event==ProximityGate.Event.FIRE) verifyThenArrive(Math.round(metres));
+    }
+    /** An arrival is being confirmed with BYD, and when a failed confirmation may be tried again (elapsed time). */
+    private boolean verifying;
+    private long verifyRetryAt;
+    /**
+     * Someone else may have the car, so its saved spot can be out of date. Before unlocking, BYD is asked where the car
+     * is: only if it's really here do the unlock and start run. Otherwise its position is updated and the trigger stays armed.
+     */
+    private void verifyThenArrive(long metres) {
+        verifying=true;
+        AppRuntime.IO.execute(()-> {
+            try {
+                double[] car=AppRuntime.api(this).location(AppRuntime.prefs(this).getString("vin",""));
+                logCarPosition("before unlocking",car);
+                handler.post(()->arrivalChecked(car,metres));
+            } catch(Exception error) {
+                AppRuntime.clearSession();
+                handler.post(()-> {
+                    verifying=false; verifyRetryAt=SystemClock.elapsedRealtime()+30_000;
+                    if(stopped) return;
+                    proximity.arm();
+                    AppRuntime.note(this,"Couldn't confirm the car is here: "+AppRuntime.safeError(error)+" Not unlocking; trying again in 30 seconds.");
+                });
+            }
+        });
+    }
+    private void arrivalChecked(double[] car,long metres) {
+        verifying=false;
+        if(stopped || AppRuntime.abroad(this)) return;
+        Location you=lastFix;
+        double apart=ProximityGate.metres(car[0],car[1],you.getLatitude(),you.getLongitude());
+        carLatitude=car[0]; carLongitude=car[1]; AppRuntime.saveCar(this,carLatitude,carLongitude);
+        if(!ProximityGate.carIsHere(apart,fireMetres)) {
+            proximity.arm(); proximity.spotChanged();
+            AppRuntime.prefs(this).edit().putBoolean("gateArmed",true).commit();
+            AppRuntime.proximityEvent(this,"Not unlocking: the car is "+Math.round(apart)+" m from you, not at its saved spot. Position updated");
+            return;
+        }
         AppRuntime.prefs(this).edit().putLong("lastAutoStartAt",System.currentTimeMillis()).putBoolean("gateArmed",false).commit();
-        AppRuntime.proximityEvent(this,"Triggered at "+Math.round(metres)+" m");
+        AppRuntime.proximityEvent(this,"Triggered at "+metres+" m");
         arrival();
     }
+    /** Every 15 minutes, a follow-only check, so the car is followed while someone else drives it. */
+    private final Runnable periodicCheck=new Runnable() {
+        @Override public void run() {
+            if(!AppRuntime.abroad(MonitorService.this)) checkCar("periodic check",0,true);
+            handler.postDelayed(this,15*60_000L);
+        }
+    };
     /** When tracking last restarted for an impossible distance (elapsed time); never at first. */
     private long lastRestart=-5*60_000L;
     /**
@@ -215,11 +263,12 @@ public final class MonitorService extends Service {
     private boolean checkCar(String reading,long gapMs,boolean followOnly) {
         if(checking || SystemClock.elapsedRealtime()-lastCheck<gapMs) return false;
         checking=true;
+        boolean travelling=onTrip || SystemClock.elapsedRealtime()-lastFastAt<2*60_000;
         AppRuntime.IO.execute(()-> {
             try {
                 double[] car=AppRuntime.api(this).location(AppRuntime.prefs(this).getString("vin",""));
-                logCarPosition(followOnly?"trip ended":"car check",car);
-                handler.post(()->carChecked(car,reading,followOnly));
+                logCarPosition(followOnly?"follow-only check":"car check",car);
+                handler.post(()->carChecked(car,reading,followOnly,travelling));
             } catch(Exception error) {
                 AppRuntime.clearSession();
                 handler.post(()-> {
@@ -235,28 +284,46 @@ public final class MonitorService extends Service {
      * Moved more than the re-arm distance: you drove it, so its new spot is saved and the trigger waits for you to leave it.
      * Still there: you walked away, so the trigger arms and, if it had fired, the walk-away action runs.
      */
-    private void carChecked(double[] car,String reading,boolean followOnly) {
+    private void carChecked(double[] car,String reading,boolean followOnly,boolean travelling) {
         checking=false; lastCheck=SystemClock.elapsedRealtime();
         if(stopped || AppRuntime.abroad(this)) return;
         long moved=Math.round(ProximityGate.metres(car[0],car[1],carLatitude,carLongitude));
-        ProximityGate.CarCheck result=ProximityGate.carCheck(moved,rearmMetres,SystemClock.elapsedRealtime()-lastFastAt<15000,followOnly);
-        // Seen: Turn off sent while pulling out, refused by BYD with 6042. The next check, a minute later, decides.
-        if(result==ProximityGate.CarCheck.UNSURE) {
-            if(followOnly) { AppRuntime.log(this,"trip ended: car still at its saved spot"); return; }
-            unsureInRow++;
-            AppRuntime.log(this,"car check: car still at its spot but you're moving, so not arming");
-            return;
+        Location you=lastFix;
+        double apart=you==null?Double.MAX_VALUE:ProximityGate.metres(car[0],car[1],you.getLatitude(),you.getLongitude());
+        ProximityGate.CarCheck result=ProximityGate.carCheck(moved,rearmMetres,apart,SystemClock.elapsedRealtime()-lastFastAt<15000,
+            travelling,followOnly,proximity.visited() || withCar);
+        switch(result) {
+            case UNSURE:
+                // Seen: Turn off sent while pulling out, refused by BYD with 6042. The next check, a minute later, decides.
+                if(followOnly) { AppRuntime.log(this,"follow-only check: car still at its saved spot"); return; }
+                unsureInRow++;
+                AppRuntime.log(this,"car check: car still at its spot but you're moving, so not arming");
+                return;
+            case MOVED_WITHOUT_YOU:
+                // Someone else is driving it (seen: your wife, 10:13 and 17:16): follow it, change nothing else.
+                if(!followOnly) unsureInRow++; // you're in another vehicle: space the checks out
+                carLatitude=car[0]; carLongitude=car[1]; AppRuntime.saveCar(this,carLatitude,carLongitude);
+                proximity.spotChanged(); withCar=false;
+                AppRuntime.proximityEvent(this,"Car moved "+moved+" m without you, "+Math.round(apart)+" m from you: position updated");
+                return;
+            case MOVED_WITH_YOU:
+                unsureInRow=0;
+                carLatitude=car[0]; carLongitude=car[1]; AppRuntime.saveCar(this,carLatitude,carLongitude);
+                proximity.carChecked(true); withCar=true;
+                AppRuntime.prefs(this).edit().putBoolean("gateArmed",false).commit();
+                AppRuntime.proximityEvent(this,"Car moved "+moved+" m with you: following it");
+                showProximity("With the car",System.currentTimeMillis());
+                return;
+            default: // WALKED_AWAY or AWAY: the car is at its spot and you're away from it
+                unsureInRow=0;
+                boolean wasArmed=proximity.armed();
+                proximity.carChecked(false); withCar=false;
+                AppRuntime.prefs(this).edit().putBoolean("gateArmed",true).commit();
+                if(!wasArmed) AppRuntime.proximityEvent(this,"Armed by GPS: "+reading);
+                showProximity(lastDistance,lastDistanceAt);
+                // Only if you were with the car: it never locks or turns off a car someone else is using (seen 17:18).
+                if(result==ProximityGate.CarCheck.WALKED_AWAY && !wasArmed) leave(AppRuntime.leaveAction(this));
         }
-        unsureInRow=0;
-        boolean drove=result==ProximityGate.CarCheck.MOVED, wasArmed=proximity.armed();
-        withCar=drove;
-        if(drove) { carLatitude=car[0]; carLongitude=car[1]; AppRuntime.saveCar(this,carLatitude,carLongitude); }
-        proximity.carChecked(drove);
-        AppRuntime.prefs(this).edit().putBoolean("gateArmed",proximity.armed()).commit();
-        if(drove) AppRuntime.proximityEvent(this,"Car moved "+moved+" m: following it");
-        else if(!wasArmed) AppRuntime.proximityEvent(this,"Armed by GPS: "+reading);
-        if(drove) showProximity("With the car",System.currentTimeMillis()); else showProximity(lastDistance,lastDistanceAt);
-        if(!drove && !wasArmed) leave(AppRuntime.leaveAction(this));
     }
     private boolean onTrustedWifi() { return currentWifi!=null && AppRuntime.trustedWifi(this).contains(currentWifi); }
     /**
