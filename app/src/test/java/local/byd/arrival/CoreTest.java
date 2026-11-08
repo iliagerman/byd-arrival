@@ -149,6 +149,9 @@ public class CoreTest {
         check(ProximityGate.carCheck(5, 20, false) == ProximityGate.CarCheck.WALKED_AWAY, "car at its spot, you walking: you walked away");
         check(ProximityGate.carCheck(9, 20, true) == ProximityGate.CarCheck.UNSURE,
             "car at its spot while you move at 26 km/h: just driven off with BYD lagging, never walking away (seen 08:06)");
+        check(ProximityGate.vehicleCheckGapMs(0) == 60_000, "in a vehicle, the car is checked every minute, so a 4-minute drive is followed");
+        check(ProximityGate.vehicleCheckGapMs(1) == 120_000, "car still at its spot while you move: wait longer before asking again");
+        check(ProximityGate.vehicleCheckGapMs(30) == 15 * 60_000, "on a long train ride, at most every 15 minutes");
         ProximityGate passing = new ProximityGate(15, 30, true);
         check(passing.observe(80, 5, true) == NONE, "armed and never near the car: no car checks");
         check(Math.abs(ProximityGate.metres(32.0, 34.0, 32.0001, 34.0) - 11.12) < 0.05, "0.0001 degrees latitude is about 11 m");

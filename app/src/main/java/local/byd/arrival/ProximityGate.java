@@ -48,6 +48,11 @@ public final class ProximityGate {
         if(movedMetres>rearmMetres) return CarCheck.MOVED;
         return movingFast?CarCheck.UNSURE:CarCheck.WALKED_AWAY;
     }
+    /**
+     * How long to wait between car checks while you're in a vehicle: a minute, so even a short drive is followed. Each
+     * UNSURE result in a row (the car stays put, e.g. you're on a bus) doubles it, up to 15 minutes.
+     */
+    public static long vehicleCheckGapMs(int unsureInRow) { return Math.min(60_000L<<Math.min(unsureInRow,4),15*60_000L); }
     /** Great-circle distance in metres between two WGS84 coordinates. */
     public static double metres(double lat1, double lon1, double lat2, double lon2) {
         double dLat = Math.toRadians(lat2 - lat1), dLon = Math.toRadians(lon2 - lon1);

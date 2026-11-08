@@ -28,6 +28,8 @@ public final class MonitorService extends Service {
     private boolean withCar;
     /** When a reading last showed you moving faster than walking (elapsed time). */
     private long lastFastAt=-60000;
+    /** Car checks in a row that found the car at its spot while you were moving (UNSURE), to space them out. */
+    private int unsureInRow;
     private long lastDistanceAt;
     private final ConnectivityManager.NetworkCallback wifiCallback=new ConnectivityManager.NetworkCallback(ConnectivityManager.NetworkCallback.FLAG_INCLUDE_LOCATION_INFO) {
         @Override public void onCapabilitiesChanged(Network network,NetworkCapabilities caps) {
@@ -185,7 +187,7 @@ public final class MonitorService extends Service {
         if(event==ProximityGate.Event.LEFT) checkCar(reading,60000);
         // Leaving is only seen after a good reading beside the car. Without one (GPS is often rough there), the car could
         // be driven off unnoticed, so while you're in a vehicle the app also checks whether the car moves with you.
-        else if(moving && !late) checkCar(reading,5*60000);
+        else if(moving && !late) checkCar(reading,ProximityGate.vehicleCheckGapMs(unsureInRow));
         if(event!=ProximityGate.Event.FIRE) return;
         AppRuntime.prefs(this).edit().putLong("lastAutoStartAt",System.currentTimeMillis()).putBoolean("gateArmed",false).commit();
         AppRuntime.proximityEvent(this,"Triggered at "+Math.round(metres)+" m");
@@ -212,7 +214,7 @@ public final class MonitorService extends Service {
     private long lastCheck;
     /**
      * You got away from the car's saved spot, by walking or by driving it, or you're in a vehicle. BYD is asked where the
-     * car is, at most once per gapMs: once a minute after leaving, every 5 minutes while in a vehicle.
+     * car is, at most once per gapMs: once a minute after leaving or while in a vehicle, less often while the car stays put.
      */
     private void checkCar(String reading,long gapMs) {
         if(checking || SystemClock.elapsedRealtime()-lastCheck<gapMs) return;
@@ -240,7 +242,12 @@ public final class MonitorService extends Service {
         long moved=Math.round(ProximityGate.metres(car[0],car[1],carLatitude,carLongitude));
         ProximityGate.CarCheck result=ProximityGate.carCheck(moved,rearmMetres,SystemClock.elapsedRealtime()-lastFastAt<15000);
         // Seen: Turn off sent while pulling out, refused by BYD with 6042. The next check, a minute later, decides.
-        if(result==ProximityGate.CarCheck.UNSURE) { AppRuntime.log(this,"car check: car still at its spot but you're moving, so not arming"); return; }
+        if(result==ProximityGate.CarCheck.UNSURE) {
+            unsureInRow++;
+            AppRuntime.log(this,"car check: car still at its spot but you're moving, so not arming");
+            return;
+        }
+        unsureInRow=0;
         boolean drove=result==ProximityGate.CarCheck.MOVED, wasArmed=proximity.armed();
         withCar=drove;
         if(drove) { carLatitude=car[0]; carLongitude=car[1]; AppRuntime.saveCar(this,carLatitude,carLongitude); }
