@@ -87,11 +87,11 @@ public class CoreTest {
         check(!BydApi.realtimeReady(new org.json.JSONObject().put("requestSerial", "x")), "an answer holding only the request id isn't ready");
         check(BydApi.batteryPercent(new org.json.JSONObject().put("elecPercent", -1)) == -1, "BYD's -1 means no battery level");
         check(BydApi.batteryPercent(new org.json.JSONObject()) == -1, "a missing battery level is reported as none");
-        check(AutoStartSettings.pauseKm("") == 700, "blank pause distance uses the default 700 km");
-        check(AutoStartSettings.pauseKm(" 400 ") == 400, "a sensible pause distance is kept");
-        check(AutoStartSettings.pauseKm("20") == 100, "the pause distance is at least 100 km");
-        check(AutoStartSettings.pauseKm("90000") == 5000, "the pause distance is at most 5000 km");
-        check(AutoStartSettings.pauseKm("far") == 700, "an unreadable pause distance uses the default");
+        check(AutoStartSettings.restartKm("") == 700, "blank restart distance uses the default 700 km");
+        check(AutoStartSettings.restartKm(" 400 ") == 400, "a sensible restart distance is kept");
+        check(AutoStartSettings.restartKm("20") == 100, "the restart distance is at least 100 km");
+        check(AutoStartSettings.restartKm("90000") == 5000, "the restart distance is at most 5000 km");
+        check(AutoStartSettings.restartKm("far") == 700, "an unreadable restart distance uses the default");
         ClimatePlan plan = ClimatePlan.defaults();
         check(plan.choose(16) == plan.freezing && plan.freezing.driverSeat && plan.freezing.temperature == 26, "below 17 °C: warm A/C and driver seat heat");
         check(plan.choose(17) == plan.cold && !plan.cold.driverSeat && plan.cold.temperature == 26, "17–20 °C: warm A/C, no seat heat");
@@ -152,6 +152,11 @@ public class CoreTest {
         check(ProximityGate.vehicleCheckGapMs(0) == 60_000, "in a vehicle, the car is checked every minute, so a 4-minute drive is followed");
         check(ProximityGate.vehicleCheckGapMs(1) == 120_000, "car still at its spot while you move: wait longer before asking again");
         check(ProximityGate.vehicleCheckGapMs(30) == 15 * 60_000, "on a long train ride, at most every 15 minutes");
+        check(ProximityGate.restartDue(800_000, 700, 10 * 60_000), "800 km from the car is beyond 700 km: restart tracking");
+        check(!ProximityGate.restartDue(26_000, 700, 10 * 60_000), "a real 26 km drive is no error");
+        check(!ProximityGate.restartDue(800_000, 700, 2 * 60_000), "at most one restart every 5 minutes, so a stuck error can't loop");
+        check(!ProximityGate.restartDue(500_000, 700, 10 * 60_000) && ProximityGate.restartDue(500_000, 450, 10 * 60_000),
+            "a wrong 500 km reading is caught with the distance set to 450 km (Israel is about 420 km long), not with 700");
         ProximityGate passing = new ProximityGate(15, 30, true);
         check(passing.observe(80, 5, true) == NONE, "armed and never near the car: no car checks");
         check(Math.abs(ProximityGate.metres(32.0, 34.0, 32.0001, 34.0) - 11.12) < 0.05, "0.0001 degrees latitude is about 11 m");

@@ -144,12 +144,10 @@ How it behaves:
 
 Phone location is often several metres off, and worse indoors. Very short distances may not work reliably.
 
-### Far from the car, and abroad mode
+### Distance check and abroad mode
 
-Tracking pauses in two ways. While it's paused there's no auto-start, no car-position check, no 30-minute battery reading and no retrying, so the app doesn't keep asking BYD, for example on a trip without a network. Widget buttons still work.
-
-- **By itself, far from the car.** Beyond **Pause beyond** (default 700 km, 100 to 5000 km) from the car, tracking pauses, and it restarts by itself once you're back within that distance. Meanwhile the app reads your location roughly once every 15 minutes, only to notice you're back, and the widget shows `Paused · 2345 km`. A new distance is saved when you leave Settings and applies straight away.
-- **By hand, abroad mode.** The **Abroad mode** switch pauses tracking straight away and suppresses the automatic restart: it stays paused, with no location readings at all, until you switch it off. The widget shows `Abroad mode`.
+- **Wrong distances restart tracking.** In Israel the car is never more than 700 km away, so a reading farther than **Restart tracking beyond** (default 700 km, 100 to 5000 km) means the car's position or your phone's location was read wrong; it has happened, for example 500 km while beside the car. Israel is about 420 km long at most (Metula to Eilat), so to catch a wrong reading like that, set it to 450 km. The reading is ignored and tracking restarts as after an app update: the car's position is read from BYD again and location readings start afresh. It restarts at most every 5 minutes, and the event line says, for example, `Read 800 km from the car, which can't be right: restarting tracking`. A new distance is saved when you leave Settings and applies straight away.
+- **Abroad mode turns that off.** When you travel, switch on **Abroad mode**: tracking pauses, with no auto-start, no requests to BYD, no location readings and no restarts, until you switch it off. The widget shows `Abroad mode`. Widget buttons still work.
 
 ### Trusted Wi-Fi (home, office)
 

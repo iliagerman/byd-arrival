@@ -70,7 +70,7 @@ public final class SettingsActivity extends Activity {
     }
     @Override protected void onResume() { super.onResume(); refresh(); }
     /** The Wi-Fi signal is read live by the monitor, so saving it on leaving takes effect without a restart. */
-    @Override protected void onPause() { stopScan(); saveWifiSignal(); savePauseKm(); super.onPause(); }
+    @Override protected void onPause() { stopScan(); saveWifiSignal(); saveRestartKm(); super.onPause(); }
 
     private void refresh() {
         SharedPreferences prefs=AppRuntime.prefs(this);
@@ -251,18 +251,18 @@ public final class SettingsActivity extends Activity {
     private void bindAbroad() {
         Switch abroad=findViewById(R.id.abroad);
         abroad.setChecked(AppRuntime.prefs(this).getBoolean("abroad",false));
-        ((EditText)findViewById(R.id.pause_km)).setText(String.valueOf(AppRuntime.pauseKm(this)));
+        ((EditText)findViewById(R.id.restart_km)).setText(String.valueOf(AppRuntime.restartKm(this)));
         abroad.setOnCheckedChangeListener((view,on)-> {
             android.content.SharedPreferences prefs=AppRuntime.prefs(this);
             prefs.edit().putBoolean("abroad",on).apply();
             if(prefs.getBoolean("monitoring",false) && "gps".equals(prefs.getString("monitorMode","gps"))) startMonitor("gps");
-            toast(on?"Abroad mode on: auto-start paused until you switch it off.":"Abroad mode off.");
+            toast(on?"Abroad mode on: tracking paused until you switch it off.":"Abroad mode off: tracking restarted.");
         });
     }
     /** Saved when you leave Settings; monitoring reads it on every reading. Anything entered becomes a working value. */
-    private void savePauseKm() {
-        EditText field=findViewById(R.id.pause_km);
-        int km=AutoStartSettings.pauseKm(field.getText().toString());
+    private void saveRestartKm() {
+        EditText field=findViewById(R.id.restart_km);
+        int km=AutoStartSettings.restartKm(field.getText().toString());
         AppRuntime.prefs(this).edit().putInt("abroadKm",km).apply();
         field.setText(String.valueOf(km));
     }

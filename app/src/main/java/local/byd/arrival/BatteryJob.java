@@ -15,7 +15,7 @@ public final class BatteryJob extends JobService {
             .setPeriodic(EVERY_MILLIS).setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY).setPersisted(true).build());
     }
     @Override public boolean onStartJob(JobParameters params) {
-        if(AppRuntime.trackingPaused(this)) return false; // paused while you're abroad or far from the car
+        if(AppRuntime.abroad(this)) return false; // paused while you're abroad
         AppRuntime.refreshBattery(this,()->jobFinished(params,false));
         return true;
     }

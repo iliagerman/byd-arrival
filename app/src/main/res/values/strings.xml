@@ -100,10 +100,10 @@
     <string name="check_updates">Check for updates</string>
     <string name="share_log">Share log</string>
     <string name="abroad_title">Abroad mode</string>
-    <string name="far_title">Far from the car</string>
-    <string name="far_body">Beyond this distance from the car, tracking pauses by itself: no auto-start, no requests to BYD and no retries. It restarts by itself once you\'re back within it.</string>
-    <string name="pause_km">Pause beyond (km from the car, 100–5000)</string>
-    <string name="abroad_body">Pauses tracking straight away and keeps it paused, even once you\'re back within the distance above, until you switch it off. Widget buttons still work.</string>
+    <string name="far_title">Distance check and abroad mode</string>
+    <string name="far_body">In Israel the car is never this far away, so a reading beyond this distance means the car\'s position or your phone\'s location was read wrong. The reading is ignored and tracking restarts: the car\'s position is read from BYD again and your location readings start afresh, at most every 5 minutes. Israel is about 420 km long, so 450 catches more wrong readings.</string>
+    <string name="restart_km">Restart tracking beyond (km from the car, 100–5000)</string>
+    <string name="abroad_body">For trips abroad: pauses tracking, so there\'s no auto-start, no requests to BYD and no restarts for long distances, until you switch it off. Widget buttons still work.</string>
     <string name="add_widget">Add widget to home screen</string>
     <string name="battery">Battery optimisation settings</string>
     <string name="forget">Forget credentials</string>

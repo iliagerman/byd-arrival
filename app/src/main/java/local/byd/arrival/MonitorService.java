@@ -79,8 +79,7 @@ public final class MonitorService extends Service {
     }
     /** GPS mode first reads the car's position from BYD, then tracks the phone against it. Paused, BYD isn't asked. */
     private void startGps() {
-        if(AppRuntime.prefs(this).getBoolean("abroad",false)) { beginAbroad(); return; }
-        if(AppRuntime.prefs(this).getBoolean("farFromCar",false)) { beginFar(); return; }
+        if(AppRuntime.abroad(this)) { beginAbroad(); return; }
         AppRuntime.note(this,"Finding the car's position…");
         AppRuntime.IO.execute(()-> {
             try {
@@ -136,24 +135,6 @@ public final class MonitorService extends Service {
         AppRuntime.setProximity(this,false,"Abroad mode",System.currentTimeMillis());
         AppRuntime.status(this,"Abroad mode: auto-start paused until you switch it off in Settings.");
     }
-    /**
-     * Beyond the pause distance: no auto-start, no car checks, no Wi-Fi arming. A rough reading every 15 minutes only
-     * tells when you're back within it, measured to the car's position saved when monitoring last read it.
-     */
-    private void beginFar() {
-        if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED) {
-            stopWithStatus("Allow location for this app, then try again."); return;
-        }
-        stopTracking();
-        double[] car=AppRuntime.savedCar(this);
-        carLatitude=car[0]; carLongitude=car[1];
-        locations=getSystemService(LocationManager.class);
-        LocationRequest rare=new LocationRequest.Builder(15*60000L).setQuality(LocationRequest.QUALITY_BALANCED_POWER_ACCURACY).build();
-        fusedListener=this::onFix;
-        locations.requestLocationUpdates(LocationManager.FUSED_PROVIDER,rare,getMainExecutor(),fusedListener);
-        int km=AppRuntime.pauseKm(this);
-        AppRuntime.status(this,"Paused: you're more than "+km+" km from the car. Tracking restarts by itself once you're back within "+km+" km.");
-    }
     /** Stops location readings and Wi-Fi arming, before switching between normal and paused tracking. */
     private void stopTracking() {
         if(fusedListener!=null) locations.removeUpdates(fusedListener);
@@ -166,11 +147,7 @@ public final class MonitorService extends Service {
     private void onFix(Location fix) {
         long age=(SystemClock.elapsedRealtimeNanos()-fix.getElapsedRealtimeNanos())/1000000;
         double metres=ProximityGate.metres(fix.getLatitude(),fix.getLongitude(),carLatitude,carLongitude);
-        if(farChanged(metres)) return;
-        if(AppRuntime.prefs(this).getBoolean("farFromCar",false)) {
-            AppRuntime.setProximity(this,false,"Paused · "+Math.round(metres/1000)+" km",System.currentTimeMillis()-age);
-            return;
-        }
+        if(metres>AppRuntime.restartKm(this)*1000.0) { impossibleDistance(metres); return; }
         boolean rough=fix.getAccuracy()>rearmMetres, late=age>30000;
         // Faster than walking you're in a vehicle (or running), not walking up to the car, so it never starts then.
         boolean moving=fix.hasSpeed() && fix.getSpeed()>FASTER_THAN_WALKING;
@@ -193,20 +170,21 @@ public final class MonitorService extends Service {
         AppRuntime.proximityEvent(this,"Triggered at "+Math.round(metres)+" m");
         arrival();
     }
+    /** When tracking last restarted for an impossible distance (elapsed time); never at first. */
+    private long lastRestart=-5*60_000L;
     /**
-     * Crossing the pause distance (Settings, default 700 km) pauses or restarts tracking. It's read on every reading, so
-     * a new value applies straight away. Returns true when it switched.
+     * A reading farther from the car than the restart distance (default 700 km; Israel is about 420 km long) is an error,
+     * a wrong car position or phone location. It's ignored, and tracking restarts as after an app update: the car's position
+     * is read from BYD again and location readings start afresh. At most once every 5 minutes.
      */
-    private boolean farChanged(double metres) {
-        int km=AppRuntime.pauseKm(this);
-        boolean far=metres>km*1000.0;
-        if(far==AppRuntime.prefs(this).getBoolean("farFromCar",false)) return false;
-        AppRuntime.prefs(this).edit().putBoolean("farFromCar",far).apply();
-        AppRuntime.proximityEvent(this,far?"Paused: "+Math.round(metres/1000)+" km from the car"
-            :"Back within "+km+" km of the car: tracking restarted");
-        stopTracking(); // no readings until the new mode is set up, e.g. while BYD is asked where the car is
+    private void impossibleDistance(double metres) {
+        long now=SystemClock.elapsedRealtime();
+        AppRuntime.log(this,"ignored: "+Math.round(metres/1000)+" km from the car is more than the restart distance");
+        if(!ProximityGate.restartDue(metres,AppRuntime.restartKm(this),now-lastRestart)) return;
+        lastRestart=now;
+        AppRuntime.proximityEvent(this,"Read "+Math.round(metres/1000)+" km from the car, which can't be right: restarting tracking");
+        stopTracking(); // no readings until the car's position is read again
         startGps();
-        return true;
     }
     private static final float FASTER_THAN_WALKING=3.5f; // about 12 km/h
     /** A car check is running, and when the last one ended (elapsed time), so checks are spaced out. */
@@ -238,7 +216,7 @@ public final class MonitorService extends Service {
      */
     private void carChecked(double[] car,String reading) {
         checking=false; lastCheck=SystemClock.elapsedRealtime();
-        if(stopped || AppRuntime.trackingPaused(this)) return;
+        if(stopped || AppRuntime.abroad(this)) return;
         long moved=Math.round(ProximityGate.metres(car[0],car[1],carLatitude,carLongitude));
         ProximityGate.CarCheck result=ProximityGate.carCheck(moved,rearmMetres,SystemClock.elapsedRealtime()-lastFastAt<15000);
         // Seen: Turn off sent while pulling out, refused by BYD with 6042. The next check, a minute later, decides.
