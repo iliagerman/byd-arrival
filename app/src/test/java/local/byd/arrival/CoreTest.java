@@ -145,10 +145,13 @@ public class CoreTest {
         check(home.observe(40, 5, true) == LEFT, "leaving the car while armed still checks whether you drove it");
         home.carChecked(true);
         check(!home.armed(), "drove off without a start: disarmed until you leave the car's new spot");
-        check(ProximityGate.carCheck(152, 20, true) == ProximityGate.CarCheck.MOVED, "car 152 m from its spot: you drove it");
-        check(ProximityGate.carCheck(5, 20, false) == ProximityGate.CarCheck.WALKED_AWAY, "car at its spot, you walking: you walked away");
-        check(ProximityGate.carCheck(9, 20, true) == ProximityGate.CarCheck.UNSURE,
+        check(ProximityGate.carCheck(152, 20, true, false) == ProximityGate.CarCheck.MOVED, "car 152 m from its spot: you drove it");
+        check(ProximityGate.carCheck(5, 20, false, false) == ProximityGate.CarCheck.WALKED_AWAY, "car at its spot, you walking: you walked away");
+        check(ProximityGate.carCheck(9, 20, true, false) == ProximityGate.CarCheck.UNSURE,
             "car at its spot while you move at 26 km/h: just driven off with BYD lagging, never walking away (seen 08:06)");
+        check(ProximityGate.carCheck(800, 20, false, true) == ProximityGate.CarCheck.MOVED, "check at the end of a trip: the car moved, so follow it");
+        check(ProximityGate.carCheck(5, 20, false, true) == ProximityGate.CarCheck.UNSURE,
+            "check at the end of a trip only follows the car: still in traffic looks like parked, so it never arms");
         check(ProximityGate.vehicleCheckGapMs(0) == 60_000, "in a vehicle, the car is checked every minute, so a 4-minute drive is followed");
         check(ProximityGate.vehicleCheckGapMs(1) == 120_000, "car still at its spot while you move: wait longer before asking again");
         check(ProximityGate.vehicleCheckGapMs(30) == 15 * 60_000, "on a long train ride, at most every 15 minutes");

@@ -43,10 +43,12 @@ public final class ProximityGate {
      * MOVED: the car is more than the re-arm distance from its saved spot, so you drove it. WALKED_AWAY: it's still there
      * and you're on foot. UNSURE: it's still there but you're moving faster than walking: you've just driven off and BYD's
      * position lags, or you're in another vehicle. Neither is walking away, so UNSURE changes nothing.
+     * A follow-only check, at the end of a trip, can only say MOVED or UNSURE: two minutes still in traffic looks the
+     * same as having parked, so it never counts as walking away.
      */
-    public static CarCheck carCheck(double movedMetres,double rearmMetres,boolean movingFast) {
+    public static CarCheck carCheck(double movedMetres,double rearmMetres,boolean movingFast,boolean followOnly) {
         if(movedMetres>rearmMetres) return CarCheck.MOVED;
-        return movingFast?CarCheck.UNSURE:CarCheck.WALKED_AWAY;
+        return movingFast || followOnly?CarCheck.UNSURE:CarCheck.WALKED_AWAY;
     }
     /**
      * How long to wait between car checks while you're in a vehicle: a minute, so even a short drive is followed. Each

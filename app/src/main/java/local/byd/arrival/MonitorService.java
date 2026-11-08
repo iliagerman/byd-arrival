@@ -30,6 +30,8 @@ public final class MonitorService extends Service {
     private long lastFastAt=-60000;
     /** Car checks in a row that found the car at its spot while you were moving (UNSURE), to space them out. */
     private int unsureInRow;
+    /** Readings faster than walking were seen and the trip hasn't been closed with a car check yet. */
+    private boolean onTrip;
     private long lastDistanceAt;
     private final ConnectivityManager.NetworkCallback wifiCallback=new ConnectivityManager.NetworkCallback(ConnectivityManager.NetworkCallback.FLAG_INCLUDE_LOCATION_INFO) {
         @Override public void onCapabilitiesChanged(Network network,NetworkCapabilities caps) {
@@ -153,7 +155,7 @@ public final class MonitorService extends Service {
         boolean rough=fix.getAccuracy()>rearmMetres, late=age>30000;
         // Faster than walking you're in a vehicle (or running), not walking up to the car, so it never starts then.
         boolean moving=fix.hasSpeed() && fix.getSpeed()>FASTER_THAN_WALKING;
-        if(moving) lastFastAt=SystemClock.elapsedRealtime();
+        if(moving) { lastFastAt=SystemClock.elapsedRealtime(); onTrip=true; }
         // A reading delivered more than 30 s late can't start or arm anything. It's shown with its own time, so it looks stale.
         ProximityGate.Event event=late?ProximityGate.Event.NONE
             :proximity.observe(metres,fix.getAccuracy(),cooldownPassed() && !onTrustedWifi() && !moving);
@@ -163,10 +165,15 @@ public final class MonitorService extends Service {
         String shown=withCar && !proximity.armed()?"With the car":Math.round(metres)+" m"+(rough?" ±"+Math.round(fix.getAccuracy()):"");
         showProximity(shown,System.currentTimeMillis()-age);
         String reading=Math.round(metres)+" m ±"+Math.round(fix.getAccuracy())+" m";
-        if(event==ProximityGate.Event.LEFT) checkCar(reading,60000);
+        if(event==ProximityGate.Event.LEFT) checkCar(reading,60000,false);
         // Leaving is only seen after a good reading beside the car. Without one (GPS is often rough there), the car could
         // be driven off unnoticed, so while you're in a vehicle the app also checks whether the car moves with you.
-        else if(moving && !late) checkCar(reading,ProximityGate.vehicleCheckGapMs(unsureInRow));
+        else if(moving && !late) checkCar(reading,ProximityGate.vehicleCheckGapMs(unsureInRow),false);
+        // Two minutes without fast readings ends the trip: one car check follows the car to where it was parked, even
+        // if checks during the drive failed (seen: BYD busy, 1008), and the next trip starts with checks every minute.
+        else if(onTrip && !late && SystemClock.elapsedRealtime()-lastFastAt>2*60_000 && checkCar(reading,0,true)) {
+            onTrip=false; unsureInRow=0;
+        }
         if(event!=ProximityGate.Event.FIRE) return;
         AppRuntime.prefs(this).edit().putLong("lastAutoStartAt",System.currentTimeMillis()).putBoolean("gateArmed",false).commit();
         AppRuntime.proximityEvent(this,"Triggered at "+Math.round(metres)+" m");
@@ -205,34 +212,37 @@ public final class MonitorService extends Service {
      * You got away from the car's saved spot, by walking or by driving it, or you're in a vehicle. BYD is asked where the
      * car is, at most once per gapMs: once a minute after leaving or while in a vehicle, less often while the car stays put.
      */
-    private void checkCar(String reading,long gapMs) {
-        if(checking || SystemClock.elapsedRealtime()-lastCheck<gapMs) return;
+    private boolean checkCar(String reading,long gapMs,boolean followOnly) {
+        if(checking || SystemClock.elapsedRealtime()-lastCheck<gapMs) return false;
         checking=true;
         AppRuntime.IO.execute(()-> {
             try {
                 double[] car=AppRuntime.api(this).location(AppRuntime.prefs(this).getString("vin",""));
-                logCarPosition("car check",car);
-                handler.post(()->carChecked(car,reading));
+                logCarPosition(followOnly?"trip ended":"car check",car);
+                handler.post(()->carChecked(car,reading,followOnly));
             } catch(Exception error) {
                 AppRuntime.clearSession();
                 handler.post(()-> {
                     checking=false; lastCheck=SystemClock.elapsedRealtime();
                     AppRuntime.note(this,"Couldn't check where the car is: "+AppRuntime.safeError(error)+" Trying again in a minute.");
+                    if(followOnly) onTrip=true; // the trip-end check failed: try it again
                 });
             }
         });
+        return true;
     }
     /**
      * Moved more than the re-arm distance: you drove it, so its new spot is saved and the trigger waits for you to leave it.
      * Still there: you walked away, so the trigger arms and, if it had fired, the walk-away action runs.
      */
-    private void carChecked(double[] car,String reading) {
+    private void carChecked(double[] car,String reading,boolean followOnly) {
         checking=false; lastCheck=SystemClock.elapsedRealtime();
         if(stopped || AppRuntime.abroad(this)) return;
         long moved=Math.round(ProximityGate.metres(car[0],car[1],carLatitude,carLongitude));
-        ProximityGate.CarCheck result=ProximityGate.carCheck(moved,rearmMetres,SystemClock.elapsedRealtime()-lastFastAt<15000);
+        ProximityGate.CarCheck result=ProximityGate.carCheck(moved,rearmMetres,SystemClock.elapsedRealtime()-lastFastAt<15000,followOnly);
         // Seen: Turn off sent while pulling out, refused by BYD with 6042. The next check, a minute later, decides.
         if(result==ProximityGate.CarCheck.UNSURE) {
+            if(followOnly) { AppRuntime.log(this,"trip ended: car still at its saved spot"); return; }
             unsureInRow++;
             AppRuntime.log(this,"car check: car still at its spot but you're moving, so not arming");
             return;
