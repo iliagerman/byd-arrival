@@ -391,9 +391,9 @@ public final class MonitorService extends Service {
     /** A failure here doesn't stop monitoring: the trigger is armed, so it can't repeat before your next arrival. */
     private void leave(String action) {
         if(action.isEmpty()) return;
-        AppRuntime.execute(this,List.of(action),false,()->{});
+        AppRuntime.execute(this,List.of(action),false,true,()->{});
     }
-    private void arrival() { AppRuntime.execute(this,Actions.arrival(AppRuntime.arrivalAction(this),AppRuntime.customs(this)),true,()->{}); }
+    private void arrival() { AppRuntime.execute(this,Actions.arrival(AppRuntime.arrivalAction(this),AppRuntime.customs(this)),true,true,()->{}); }
     @Override public void onDestroy() {
         stopped=true;
         handler.removeCallbacksAndMessages(null);

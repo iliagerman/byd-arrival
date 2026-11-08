@@ -11,7 +11,7 @@ public final class CommandService extends Service {
     @Override public int onStartCommand(Intent intent,int flags,int startId) {
         startForeground(10,AppRuntime.notification(this,"Running car actions…","results"));
         List<String> actions=Arrays.asList(intent.getStringExtra("actions").split(","));
-        AppRuntime.execute(this,actions,false,()->stopSelf(startId));
+        AppRuntime.execute(this,actions,false,false,()->stopSelf(startId));
         return START_NOT_STICKY;
     }
     @Override public IBinder onBind(Intent intent) { return null; }

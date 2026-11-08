@@ -203,11 +203,13 @@ final class AppRuntime {
         if(error instanceof IllegalStateException) return "Save credentials and select a vehicle first.";
         return "Action failed ("+error.getClass().getSimpleName()+"). No retry. Check settings and car.";
     }
+    static final Handler MAIN=new Handler(Looper.getMainLooper());
     /**
-     * Runs actions (built-in codes or custom ids) once: verifies the stored PIN, then each step, no retries.
+     * Runs actions (built-in codes or custom ids) once: verifies the stored PIN, then each step, no retries. Automatic
+     * actions (retryUnsent) are tried once more after 20 seconds if the network failed before any command was sent.
      * Records the pressed action and its result (busy, ok, fail) for the widget's badge.
      */
-    static void execute(Context context,List<String> actions,boolean automation,Runnable finished) {
+    static void execute(Context context,List<String> actions,boolean automation,boolean retryUnsent,Runnable finished) {
         Context c=context.getApplicationContext();
         if(!BUSY.compareAndSet(false,true)) { status(c,"Already running; duplicate ignored."); finished.run(); return; }
         // pref change wakes UI listeners; BUSY is the truth
@@ -215,6 +217,7 @@ final class AppRuntime {
         IO.execute(()-> {
             PowerManager.WakeLock wake=c.getSystemService(PowerManager.class).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,"byd-arrival:command");
             wake.acquire(180000);
+            boolean commandsStarted=false;
             try {
                 String vin=prefs(c).getString("vin","");
                 if(vin.isEmpty()) throw new IllegalStateException("Select a vehicle");
@@ -223,13 +226,20 @@ final class AppRuntime {
                 BydApi client=api(c); client.verifyPin(vin);
                 List<Actions.Custom> customs=customs(c);
                 List<String> notes=new ArrayList<>();
+                commandsStarted=true;
                 Routine.run(Actions.expand(actions,customs),step->runStep(c,client,vin,step,notes));
                 prefs(c).edit().putString("lastResult","ok").apply();
                 refreshBattery(c,()->{}); // the car is awake now, so its battery level is current
                 status(c,"Done: "+Actions.labels(actions,customs)+(notes.isEmpty()?"":" ("+String.join(", ",notes)+")")+". Confirmed by BYD.");
             } catch(Exception error) {
-                prefs(c).edit().putString("lastResult","fail").apply();
                 clearSession();
+                if(retryUnsent && Routine.retryable(error,commandsStarted)) {
+                    // Seen 20:16: Walk away timed out while checking the PIN, and the car was left on.
+                    status(c,"Network problem before anything reached the car ("+error.getClass().getSimpleName()+"); trying once more in 20 seconds.");
+                    MAIN.postDelayed(()->execute(c,actions,automation,false,finished),20000);
+                    return;
+                }
+                prefs(c).edit().putString("lastResult","fail").apply();
                 if(automation) stopMonitoring(c);
                 status(c,safeError(error)+(automation?" Automation stopped.":""));
             } finally {

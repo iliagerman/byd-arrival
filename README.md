@@ -83,7 +83,7 @@ Long-press your home screen → Widgets → **BYD Arrival**, or use Settings →
 
 ### Home screen
 
-Shows the latest status, the auto-start state, a large **Start car** button and a tile for every action. Commands are never retried automatically, with two exceptions where BYD refuses a request without acting on it. Signing in with the same account elsewhere, for example in the official app, ends this app's session, so the app signs in again and sends the request once more. And when the car is still busy with the previous command (code 6024, for example windows still closing during Close & lock), the app waits 5 seconds and sends it again, up to 3 times. If a result is unknown, check the car before trying again.
+Shows the latest status, the auto-start state, a large **Start car** button and a tile for every action. Commands are never retried automatically, with two exceptions where BYD refuses a request without acting on it. Signing in with the same account elsewhere, for example in the official app, ends this app's session, so the app signs in again and sends the request once more. And when the car is still busy with the previous command (code 6024, for example windows still closing during Close & lock), the app waits 5 seconds and sends it again, up to 3 times. Automatic actions (auto-start and the walk-away action) are tried once more after 20 seconds when the network failed before any command was sent, for example while checking the PIN; the car can't have acted then. If a result is unknown, check the car before trying again.
 
 ### Start car
 

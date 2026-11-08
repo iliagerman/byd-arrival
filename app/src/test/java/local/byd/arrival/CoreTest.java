@@ -175,6 +175,10 @@ public class CoreTest {
         check(!ProximityGate.movingFast(true, 17 / 3.6f, 235, 20), "17 km/h from a ±235 m reading at home is noise, not driving (seen 20:29)");
         check(ProximityGate.movingFast(true, 30 / 3.6f, 6, 20), "30 km/h from a ±6 m reading is driving");
         check(!ProximityGate.movingFast(true, 6 / 3.6f, 5, 20) && !ProximityGate.movingFast(false, 0, 5, 20), "walking, or no speed, is not driving");
+        check(Routine.retryable(new java.net.SocketTimeoutException(), false), "a network timeout before any command (PIN check, seen 20:16) is tried once more");
+        check(!Routine.retryable(new java.net.SocketTimeoutException(), true), "a timeout after commands started is never retried: the car may have acted");
+        check(!Routine.retryable(new java.io.IOException("BYD API rejected request (code 5011); no retry"), false),
+            "a refusal from BYD, such as a wrong PIN, is never retried");
         ProximityGate passing = new ProximityGate(15, 30, true);
         check(passing.observe(80, 5, true) == NONE, "armed and never near the car: no car checks");
         check(Math.abs(ProximityGate.metres(32.0, 34.0, 32.0001, 34.0) - 11.12) < 0.05, "0.0001 degrees latitude is about 11 m");
