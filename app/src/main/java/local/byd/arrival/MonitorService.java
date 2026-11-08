@@ -24,6 +24,10 @@ public final class MonitorService extends Service {
     /** Connected Wi-Fi name, null when none. Only touched on the main thread. */
     private String currentWifi;
     private String lastDistance="No fix";
+    /** The last car check found the car moving with you; until you walk away from it, the widget says "With the car". */
+    private boolean withCar;
+    /** When a reading last showed you moving faster than walking (elapsed time). */
+    private long lastFastAt=-60000;
     private long lastDistanceAt;
     private final ConnectivityManager.NetworkCallback wifiCallback=new ConnectivityManager.NetworkCallback(ConnectivityManager.NetworkCallback.FLAG_INCLUDE_LOCATION_INFO) {
         @Override public void onCapabilitiesChanged(Network network,NetworkCapabilities caps) {
@@ -166,14 +170,17 @@ public final class MonitorService extends Service {
             return;
         }
         boolean rough=fix.getAccuracy()>rearmMetres, late=age>30000;
-        // Faster than 25 km/h you're in a vehicle, not walking up to the car, so it never starts then.
-        boolean moving=fix.hasSpeed() && fix.getSpeed()>DRIVING_METRES_PER_SECOND;
+        // Faster than walking you're in a vehicle (or running), not walking up to the car, so it never starts then.
+        boolean moving=fix.hasSpeed() && fix.getSpeed()>FASTER_THAN_WALKING;
+        if(moving) lastFastAt=SystemClock.elapsedRealtime();
         // A reading delivered more than 30 s late can't start or arm anything. It's shown with its own time, so it looks stale.
         ProximityGate.Event event=late?ProximityGate.Event.NONE
             :proximity.observe(metres,fix.getAccuracy(),cooldownPassed() && !onTrustedWifi() && !moving);
         AppRuntime.log(this,fix.getProvider()+" "+Math.round(metres)+" m ±"+Math.round(fix.getAccuracy())+" m, "+age/1000+" s old"
             +(moving?", "+Math.round(fix.getSpeed()*3.6)+" km/h":"")+(event==ProximityGate.Event.NONE?"":", "+event));
-        showProximity(Math.round(metres)+" m"+(rough?" ±"+Math.round(fix.getAccuracy()):""),System.currentTimeMillis()-age);
+        // Following the car, the distance to its last checked spot means nothing: you're in it.
+        String shown=withCar && !proximity.armed()?"With the car":Math.round(metres)+" m"+(rough?" ±"+Math.round(fix.getAccuracy()):"");
+        showProximity(shown,System.currentTimeMillis()-age);
         String reading=Math.round(metres)+" m ±"+Math.round(fix.getAccuracy())+" m";
         if(event==ProximityGate.Event.LEFT) checkCar(reading,60000);
         // Leaving is only seen after a good reading beside the car. Without one (GPS is often rough there), the car could
@@ -199,7 +206,7 @@ public final class MonitorService extends Service {
         startGps();
         return true;
     }
-    private static final float DRIVING_METRES_PER_SECOND=7; // 25 km/h
+    private static final float FASTER_THAN_WALKING=3.5f; // about 12 km/h
     /** A car check is running, and when the last one ended (elapsed time), so checks are spaced out. */
     private boolean checking;
     private long lastCheck;
@@ -231,13 +238,17 @@ public final class MonitorService extends Service {
         checking=false; lastCheck=SystemClock.elapsedRealtime();
         if(stopped || AppRuntime.trackingPaused(this)) return;
         long moved=Math.round(ProximityGate.metres(car[0],car[1],carLatitude,carLongitude));
-        boolean drove=moved>rearmMetres, wasArmed=proximity.armed();
+        ProximityGate.CarCheck result=ProximityGate.carCheck(moved,rearmMetres,SystemClock.elapsedRealtime()-lastFastAt<15000);
+        // Seen: Turn off sent while pulling out, refused by BYD with 6042. The next check, a minute later, decides.
+        if(result==ProximityGate.CarCheck.UNSURE) { AppRuntime.log(this,"car check: car still at its spot but you're moving, so not arming"); return; }
+        boolean drove=result==ProximityGate.CarCheck.MOVED, wasArmed=proximity.armed();
+        withCar=drove;
         if(drove) { carLatitude=car[0]; carLongitude=car[1]; AppRuntime.saveCar(this,carLatitude,carLongitude); }
         proximity.carChecked(drove);
         AppRuntime.prefs(this).edit().putBoolean("gateArmed",proximity.armed()).commit();
         if(drove) AppRuntime.proximityEvent(this,"Car moved "+moved+" m: following it");
         else if(!wasArmed) AppRuntime.proximityEvent(this,"Armed by GPS: "+reading);
-        if(drove) showProximity("Car moved",System.currentTimeMillis()); else showProximity(lastDistance,lastDistanceAt);
+        if(drove) showProximity("With the car",System.currentTimeMillis()); else showProximity(lastDistance,lastDistanceAt);
         if(!drove && !wasArmed) leave(AppRuntime.leaveAction(this));
     }
     private boolean onTrustedWifi() { return currentWifi!=null && AppRuntime.trustedWifi(this).contains(currentWifi); }

@@ -37,6 +37,17 @@ public final class ProximityGate {
         armed = !moved;
         visited = false;
     }
+    /** What a car check means for the trigger. */
+    public enum CarCheck { MOVED, WALKED_AWAY, UNSURE }
+    /**
+     * MOVED: the car is more than the re-arm distance from its saved spot, so you drove it. WALKED_AWAY: it's still there
+     * and you're on foot. UNSURE: it's still there but you're moving faster than walking: you've just driven off and BYD's
+     * position lags, or you're in another vehicle. Neither is walking away, so UNSURE changes nothing.
+     */
+    public static CarCheck carCheck(double movedMetres,double rearmMetres,boolean movingFast) {
+        if(movedMetres>rearmMetres) return CarCheck.MOVED;
+        return movingFast?CarCheck.UNSURE:CarCheck.WALKED_AWAY;
+    }
     /** Great-circle distance in metres between two WGS84 coordinates. */
     public static double metres(double lat1, double lon1, double lat2, double lon2) {
         double dLat = Math.toRadians(lat2 - lat1), dLon = Math.toRadians(lon2 - lon1);

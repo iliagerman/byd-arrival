@@ -145,6 +145,10 @@ public class CoreTest {
         check(home.observe(40, 5, true) == LEFT, "leaving the car while armed still checks whether you drove it");
         home.carChecked(true);
         check(!home.armed(), "drove off without a start: disarmed until you leave the car's new spot");
+        check(ProximityGate.carCheck(152, 20, true) == ProximityGate.CarCheck.MOVED, "car 152 m from its spot: you drove it");
+        check(ProximityGate.carCheck(5, 20, false) == ProximityGate.CarCheck.WALKED_AWAY, "car at its spot, you walking: you walked away");
+        check(ProximityGate.carCheck(9, 20, true) == ProximityGate.CarCheck.UNSURE,
+            "car at its spot while you move at 26 km/h: just driven off with BYD lagging, never walking away (seen 08:06)");
         ProximityGate passing = new ProximityGate(15, 30, true);
         check(passing.observe(80, 5, true) == NONE, "armed and never near the car: no car checks");
         check(Math.abs(ProximityGate.metres(32.0, 34.0, 32.0001, 34.0) - 11.12) < 0.05, "0.0001 degrees latitude is about 11 m");
