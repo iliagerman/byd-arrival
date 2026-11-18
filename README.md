@@ -142,7 +142,7 @@ You can't save values that don't work together, because the app adjusts them for
 How it behaves:
 
 - **It fires once per arrival.** After firing, it waits until you've clearly left. The whole accuracy margin of a reading must be past the re-arm distance, so 30 m ±15 m doesn't count when the re-arm distance is 20 m.
-- **It must see you leave first.** It starts disarmed, so turning it on beside the car does nothing.
+- **It must see you leave first.** It starts disarmed, so turning it on beside the car does nothing. After an app update, a phone restart or Android stopping the app, both the beacon and the distance trigger keep whether they were armed, so being near the car at that moment doesn't leave them disarmed.
 - **Inaccurate readings can't fire it.** Readings less accurate than the re-arm distance are ignored.
 - **A failed command stops monitoring,** with a message explaining why. A failed walk-away action doesn't, because it can't repeat before your next arrival.
 - **One start and one walk-away per stay.** Whichever trigger notices your arrival first (a beacon or the distance) starts the car, and the other stays silent until you've left. Leaving works the same way: whichever notices first that you walked away runs the walk-away action, once. That's the beacon going out of range (usually within about a minute), or getting past the re-arm distance.

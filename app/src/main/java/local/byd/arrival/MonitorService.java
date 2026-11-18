@@ -238,7 +238,7 @@ public final class MonitorService extends Service {
             return;
         }
         AppRuntime.prefs(this).edit().putLong("lastAutoStartAt",System.currentTimeMillis()).putBoolean("gateArmed",false).commit();
-        if(beaconGate!=null) beaconGate.disarm();
+        if(beaconGate!=null) { beaconGate.disarm(); saveBeaconArmed(); }
         setWalkAwayPending(true);
         lastArrivalAt=SystemClock.elapsedRealtime();
         AppRuntime.proximityEvent(this,"Triggered by distance: "+metres+" m");
@@ -336,7 +336,7 @@ public final class MonitorService extends Service {
                 unsureInRow=0;
                 carLatitude=car[0]; carLongitude=car[1]; AppRuntime.saveCar(this,carLatitude,carLongitude);
                 proximity.carChecked(true); withCar=true;
-                if(beaconGate!=null) beaconGate.disarm(); // you're in the car: a dip in its signal mustn't start it mid-trip
+                if(beaconGate!=null) { beaconGate.disarm(); saveBeaconArmed(); } // you're in the car: a dip in its signal mustn't start it mid-trip
                 setWalkAwayPending(true);
                 AppRuntime.prefs(this).edit().putBoolean("gateArmed",false).commit();
                 AppRuntime.proximityEvent(this,"Car moved "+moved+" m with you: following it");
@@ -370,7 +370,7 @@ public final class MonitorService extends Service {
      */
     private void beaconLeft(double[] car,long moved) {
         if(beaconGate.strongSince(beaconCheckAt-started)) { AppRuntime.log(this,"beacon back at full strength: you're at the car"); return; }
-        beaconGate.leftCar();
+        beaconGate.leftCar(); saveBeaconArmed();
         if(SystemClock.elapsedRealtime()-lastFastAt<60_000) {
             AppRuntime.log(this,"beacon out of range while you're in a vehicle: not walking away");
             return;
@@ -467,7 +467,7 @@ public final class MonitorService extends Service {
             return;
         }
         proximity.arm();
-        if(beaconGate!=null) beaconGate.arm();
+        if(beaconGate!=null) { beaconGate.arm(); saveBeaconArmed(); }
         AppRuntime.prefs(this).edit().putBoolean("gateArmed",true).commit();
         AppRuntime.proximityEvent(this,"Armed by Wi-Fi "+name+": "+signal+" dBm");
         showProximity(lastDistance,lastDistanceAt);
@@ -497,6 +497,9 @@ public final class MonitorService extends Service {
         started=SystemClock.elapsedRealtime();
         int seconds=AppRuntime.beaconScanSeconds(this);
         beaconGate=new ArrivalGate(AutoStartSettings.beaconAbsentMillis(seconds));
+        // Armed before a restart (app update, phone restart), it stays armed: near the car the beacon is still heard,
+        // so it couldn't re-arm until you walked well away (seen 20:32, "Not armed · 22 m" right after an update).
+        if(AppRuntime.prefs(this).getBoolean("beaconArmed",false)) beaconGate.arm();
         // Filters are required: Android stops delivering unfiltered scan results while the screen is off.
         filters=new ArrayList<>();
         byte[] mask=new byte[22];
@@ -520,7 +523,7 @@ public final class MonitorService extends Service {
      */
     private void beaconGone() {
         if(!beaconGate.armed()) {
-            beaconGate.arm();
+            beaconGate.arm(); saveBeaconArmed();
             AppRuntime.proximityEvent(this,"Armed by Bluetooth: the beacon is out of range");
             showProximity(lastDistance,lastDistanceAt);
         }
@@ -547,6 +550,7 @@ public final class MonitorService extends Service {
         if(rssi>=beacon.threshold) atCar();
         boolean mayStart=cooldownPassed() && !onTrustedWifi() && !verifying && SystemClock.elapsedRealtime()-lastFastAt>=15000;
         if(!beaconGate.observe(SystemClock.elapsedRealtime()-started,rssi-beacon.threshold,mayStart)) return;
+        saveBeaconArmed();
         proximity.startedByBeacon();
         AppRuntime.prefs(this).edit().putLong("lastAutoStartAt",System.currentTimeMillis()).putBoolean("gateArmed",false).commit();
         setWalkAwayPending(true);
@@ -555,6 +559,8 @@ public final class MonitorService extends Service {
         showProximity(lastDistance,lastDistanceAt);
         arrival("Bluetooth: "+beacon.label+" at "+rssi+" dBm");
     }
+    /** Saves whether the Bluetooth trigger is armed, so a restart keeps it, like the distance trigger's. */
+    private void saveBeaconArmed() { AppRuntime.prefs(this).edit().putBoolean("beaconArmed",beaconGate.armed()).commit(); }
     /** A beacon at its strength: you're at the car. Keeps the phone's reading if it's fresh and accurate enough to say where. */
     private void atCar() {
         lastStrongAt=System.currentTimeMillis();
