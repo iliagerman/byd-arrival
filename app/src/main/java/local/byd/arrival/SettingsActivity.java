@@ -3,8 +3,6 @@ package local.byd.arrival;
 import android.Manifest;
 import android.app.*;
 import android.appwidget.AppWidgetManager;
-import android.bluetooth.*;
-import android.bluetooth.le.*;
 import android.content.*;
 import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
@@ -22,32 +20,23 @@ import java.util.*;
 /** Account, start car, actions, widget, automation and phone settings. Secure window: credentials are typed here. */
 public final class SettingsActivity extends Activity {
     private static final int GUIDE=5;
-    private EditText rssi;
     private StartSettings start;
-    private TextView accountState,beacon;
-    private LinearLayout devices;
-    private final Map<String,TextView> found=new LinkedHashMap<>();
-    private final Handler handler=new Handler(Looper.getMainLooper());
-    private BluetoothLeScanner scanner;
-    private final ScanCallback scanCallback=new ScanCallback() {
-        @Override public void onScanResult(int type,ScanResult result) { runOnUiThread(()->showDevice(result)); }
-        @Override public void onScanFailed(int error) { runOnUiThread(()->toast("Scan failed: "+error)); }
-    };
+    private BeaconSettings beacons;
+    private TextView accountState;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
         setContentView(R.layout.activity_settings);
         SharedPreferences prefs=AppRuntime.prefs(this);
-        rssi=findViewById(R.id.rssi);
-        accountState=findViewById(R.id.account_state); beacon=findViewById(R.id.beacon); devices=findViewById(R.id.devices);
-        rssi.setText(Integer.toString(prefs.getInt("rssi",-65)));
+        accountState=findViewById(R.id.account_state);
         loadAutoStart();
         showWifi();
         bindAbroad();
         ((EditText)findViewById(R.id.wifi_signal)).setText(String.valueOf(AppRuntime.wifiSignal(this)));
         start=new StartSettings(this);
         new ActionSettings(this);
+        beacons=new BeaconSettings(this,this::restartIfMonitoring);
         click(R.id.back,this::finish);
         click(R.id.save_account,()->SignIn.show(this,this::refresh));
         click(R.id.change_car,()->SignIn.changeCar(this,this::refresh));
@@ -55,11 +44,9 @@ public final class SettingsActivity extends Activity {
             try { start.save(); toast("Start settings saved."); }
             catch(IllegalArgumentException e) { toast(e.getMessage()); }
         });
-        click(R.id.scan,this::scan);
         click(R.id.add_wifi,this::addCurrentWifi);
-        click(R.id.monitor_gps,()->enableMonitor("gps"));
+        click(R.id.monitor_gps,this::enableMonitor);
         click(R.id.auto_guide,()->startActivityForResult(new Intent(this,WelcomeActivity.class),GUIDE));
-        click(R.id.monitor_ble,()->enableMonitor("ble"));
         click(R.id.monitor_stop,()-> { AppRuntime.stopMonitoring(this); toast("Monitoring stopped."); });
         click(R.id.add_widget,this::addWidget);
         click(R.id.grant,()-> { if(Permissions.complete(this)) toast("All permissions are granted."); else Permissions.askNext(this); });
@@ -71,7 +58,7 @@ public final class SettingsActivity extends Activity {
     }
     @Override protected void onResume() { super.onResume(); refresh(); }
     /** The Wi-Fi signal is read live by the monitor, so saving it on leaving takes effect without a restart. */
-    @Override protected void onPause() { stopScan(); saveWifiSignal(); saveRestartKm(); super.onPause(); }
+    @Override protected void onPause() { beacons.stop(); saveWifiSignal(); saveRestartKm(); super.onPause(); }
 
     private void refresh() {
         SharedPreferences prefs=AppRuntime.prefs(this);
@@ -87,10 +74,8 @@ public final class SettingsActivity extends Activity {
         mark(state,has(Manifest.permission.ACCESS_BACKGROUND_LOCATION),"Location: allow all the time");
         mark(state,has(Manifest.permission.POST_NOTIFICATIONS),"Notifications");
         mark(state,Permissions.batteryUnrestricted(this),"Battery: unrestricted");
-        mark(state,Permissions.bluetoothReady(this),"Nearby devices (only for a Bluetooth beacon)");
+        mark(state,Permissions.bluetoothReady(this),"Nearby devices (for Bluetooth beacons)");
         ((TextView)findViewById(R.id.permission_state)).setText(state);
-        String address=prefs.getString("beacon","");
-        beacon.setText(address.isEmpty()?"No Bluetooth signal selected.":"Selected signal: "+address);
     }
     private boolean has(String permission) { return Permissions.has(this,permission); }
     @Override public void onRequestPermissionsResult(int code,String[] permissions,int[] results) {
@@ -110,43 +95,16 @@ public final class SettingsActivity extends Activity {
         out.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD),start,out.length(),0);
         out.append("  ").append(name);
     }
-    private void scan() {
-        if(!Permissions.bluetoothReady(this)) {
-            Permissions.requestBluetooth(this);
-            toast("Allow nearby devices, then tap Scan again."); return;
-        }
-        if(checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN)!=PackageManager.PERMISSION_GRANTED) return;
-        BluetoothAdapter adapter=getSystemService(BluetoothManager.class).getAdapter();
-        if(adapter==null || !adapter.isEnabled()) { toast("Turn Bluetooth on first."); return; }
-        stopScan(); found.clear(); devices.removeAllViews();
-        scanner=adapter.getBluetoothLeScanner();
-        scanner.startScan(null,new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build(),scanCallback);
-        toast("Scanning for 20 seconds…");
-        handler.postDelayed(()-> { stopScan(); toast("Scan complete. Tap a signal to select it."); },20000);
-    }
-    private void showDevice(ScanResult result) {
-        if(checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT)!=PackageManager.PERMISSION_GRANTED) return;
-        String address=result.getDevice().getAddress(), name=result.getDevice().getName();
-        if(!found.containsKey(address)) {
-            TextView row=(TextView)getLayoutInflater().inflate(R.layout.device_row,devices,false);
-            row.setOnClickListener(v-> {
-                AppRuntime.stopMonitoring(this); stopScan();
-                AppRuntime.prefs(this).edit().putString("beacon",address).apply(); refresh();
-            });
-            devices.addView(row); found.put(address,row);
-        }
-        found.get(address).setText((name==null?"Unnamed signal":name)+"\n"+address+" · "+result.getRssi()+" dBm");
-    }
-    /** GPS needs only the car and location permission. Bluetooth also needs a selected signal and a threshold. */
-    private void enableMonitor(String mode) {
+    /** Monitoring always uses GPS, and the beacons in "Your beacons" too. It needs the car and location permission. */
+    private void enableMonitor() {
         if(!AppRuntime.ready(this)) { toast("Sign in and choose your car first."); return; }
         if(!Permissions.gpsReady(this)) { toast("Grant the permissions first."); Permissions.askNext(this); return; }
-        if("ble".equals(mode) && !Permissions.bluetoothReady(this)) { toast("Tap Scan to allow nearby devices first."); return; }
-        if("ble".equals(mode) && !beaconReady()) return;
-        if("gps".equals(mode)) saveAutoStart();
+        saveAutoStart();
         saveInterval();
-        startMonitor(mode);
+        startMonitor();
     }
+    /** Beacon changes apply straight away: a running monitor restarts with the new list. */
+    private void restartIfMonitoring() { if(AppRuntime.prefs(this).getBoolean("monitoring",false)) startMonitor(); }
     private void loadAutoStart() {
         ((EditText)findViewById(R.id.fire_metres)).setText(String.valueOf(AppRuntime.fireMetres(this)));
         ((EditText)findViewById(R.id.rearm_metres)).setText(String.valueOf(AppRuntime.rearmMetres(this)));
@@ -223,25 +181,10 @@ public final class SettingsActivity extends Activity {
             list.addView(row);
         }
     }
-    private boolean beaconReady() {
-        int threshold;
-        try { threshold=Integer.parseInt(rssi.getText().toString()); }
-        catch(NumberFormatException e) { threshold=0; }
-        if(threshold < -95 || threshold > -30) { toast("Threshold must be between −95 and −30 dBm."); return false; }
-        if(!BluetoothAdapter.checkBluetoothAddress(AppRuntime.prefs(this).getString("beacon",""))) { toast("Scan and select a Bluetooth signal first."); return false; }
-        AppRuntime.prefs(this).edit().putInt("rssi",threshold).apply();
-        return true;
-    }
-    private void startMonitor(String mode) {
-        stopScan(); stopService(new Intent(this,MonitorService.class));
-        startForegroundService(new Intent(this,MonitorService.class).putExtra("mode",mode));
-        toast("gps".equals(mode)?"Starting GPS monitoring…":"Starting Bluetooth monitoring…");
-    }
-    private void stopScan() {
-        handler.removeCallbacksAndMessages(null);
-        if(scanner==null) return;
-        if(checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN)==PackageManager.PERMISSION_GRANTED) scanner.stopScan(scanCallback);
-        scanner=null;
+    private void startMonitor() {
+        stopService(new Intent(this,MonitorService.class));
+        startForegroundService(new Intent(this,MonitorService.class));
+        toast(AppRuntime.beacons(this).isEmpty()?"Starting monitoring…":"Starting monitoring with GPS and Bluetooth…");
     }
     private void addWidget() {
         AppWidgetManager manager=getSystemService(AppWidgetManager.class);
@@ -256,7 +199,7 @@ public final class SettingsActivity extends Activity {
         abroad.setOnCheckedChangeListener((view,on)-> {
             android.content.SharedPreferences prefs=AppRuntime.prefs(this);
             prefs.edit().putBoolean("abroad",on).apply();
-            if(prefs.getBoolean("monitoring",false) && "gps".equals(prefs.getString("monitorMode","gps"))) startMonitor("gps");
+            if(prefs.getBoolean("monitoring",false)) startMonitor();
             toast(on?"Abroad mode on: tracking paused until you switch it off.":"Abroad mode off: tracking restarted.");
         });
     }

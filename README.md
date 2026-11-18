@@ -65,7 +65,7 @@ To check a download, compare it with the SHA-256 in that [release's notes](https
 | Location, "Allow all the time" | Measures your distance to the car while the screen is off, and reads your Wi-Fi name. Only auto-start and the trusted Wi-Fi list need it. |
 | Notifications | Shows command results and update notices. |
 | Unrestricted battery | Stops Android from pausing auto-start. |
-| Nearby devices | Only for a Bluetooth beacon. Asked only when you scan for one. |
+| Nearby devices | Only for Bluetooth beacons. Asked when you first scan for one. |
 
 Settings → **Permissions** shows a green ✓ or red ✗ for each, with a button to grant what's missing.
 
@@ -133,7 +133,7 @@ How it behaves:
 - **It must see you leave first.** It starts disarmed, so turning it on beside the car does nothing.
 - **Inaccurate readings can't fire it.** Readings less accurate than the re-arm distance are ignored.
 - **A failed command stops monitoring,** with a message explaining why. A failed walk-away action doesn't, because it can't repeat before your next arrival.
-- **The walk-away action runs once you're past the re-arm distance after an auto-start.** With GPS, it runs only when BYD reports the car still at its spot, so driving off doesn't run it; it runs once you walk away from where you parked. Arming by a trusted Wi-Fi never runs it. With a Bluetooth beacon, it runs once the beacon has been out of range long enough to re-arm (see below).
+- **The walk-away action runs once you're past the re-arm distance after an auto-start.** With GPS, it runs only when BYD reports the car still at its spot, so driving off doesn't run it; it runs once you walk away from where you parked. Arming by a trusted Wi-Fi never runs it. A beacon going out of range never runs it, because the beacon also leaves when someone else drives the car away.
 - **It restarts by itself** after an app update, after the phone restarts, and if Android stops the app. The event line then says so, for example `Restarted after the phone restarted`.
 - **It keeps trying when it can't reach the car.** If BYD has no position for the car or the network isn't up yet (common right after a restart), it tries again after 1 minute, then less often, up to every 15 minutes. Only **Stop**, a failed car command, signing in again or forgetting credentials turn it off.
 - **It shows how good the reading is.** The time next to the distance is when the reading was taken, so a stale one looks stale. A reading too rough to use shows its margin, for example `1991 m ±1500`; it can't start or arm anything. Readings more than 30 seconds late are ignored too. The app asks both GPS and Google's combined location, because the combined one sometimes falls back to a rough network position while GPS works.
@@ -166,12 +166,23 @@ To choose the value, tap **Add current Wi-Fi** inside and again at the car; each
 
 Android doesn't report every small signal change, and may report fewer while the screen is off. If you join on a weak signal and walk in without using the phone, it may only arm once you do.
 
-### Bluetooth beacon (optional)
+### Bluetooth beacons in the car
 
-Auto-start can use a small Bluetooth beacon left in the car instead of GPS. Use a plain iBeacon or Eddystone beacon with a fixed address. Tracker tags change their address and won't work, and a car's own Bluetooth usually can't be found by this scan.
+A small beacon kept in the car is the first trigger: auto-start fires when a beacon's signal reaches its strength **or** when you're within the start distance, whichever comes first, and the other then counts as having fired too. Because the beacon is in the car, a strong signal proves the car is there, so unlike the start distance, BYD isn't asked first, which makes it quicker. Trusted Wi-Fi, the minimum time between starts and "never while driving" apply to it too.
 
-Under Settings → **Bluetooth beacon**, scan and tap your beacon, set the signal threshold (default −65 dBm), then tap **Start Bluetooth monitoring**. It fires after three strong readings in a row and re-arms after 60 seconds out of range. With **Check every** below 10 seconds it scans nonstop. From 10 seconds, it scans for 5 seconds once per interval to save battery, and re-arms after two intervals out of range if that is longer than 60 seconds. Signal strength is only a rough guide to distance, and Bluetooth signals can be spoofed.
+Under Settings → **Bluetooth beacons in the car**:
 
+1. Tap **Scan for beacons (20 s)**. **Nearby** lists what the phone hears, beacons first and strongest first, so hold your beacon next to the phone and it's at the top. Each row says what it is: an iBeacon with its major and minor, an Eddystone beacon, or another device.
+2. Tap **Add** next to your beacon. It moves to **Your beacons**, which lists only the beacons you chose. You can add more than one; any of them triggers.
+3. Put the beacon in the car, stand where the car should start (for example beside the driver's door) and tap **Calibrate**. The app listens for 10 seconds and sets the trigger 3 dB under the middle reading, so that spot triggers reliably. Until then a beacon uses −70 dBm.
+4. Tap **Start monitoring**. Monitoring uses GPS and your beacons together.
+
+How it behaves:
+
+- An iBeacon is recognised by its UUID, major and minor, because its address may change; any other beacon by its address. Use a beacon that broadcasts all the time; tracker tags change their address, and a car's own Bluetooth usually can't be found by this scan.
+- It fires after three strong readings in a row, and is ready again after the beacon was out of range for 60 seconds (two scan intervals with long **Check every** values). A beacon going out of range never runs the walk-away action.
+- With **Check every** below 10 seconds it scans nonstop; from 10 seconds it scans for 5 seconds once per interval to save battery.
+- Signal strength is only a rough guide to distance, and Bluetooth signals can be spoofed.
 ## Updates
 
 The app looks for new versions at launch, about every 12 hours in the background, and when you tap Settings → **Check for updates**.

@@ -17,7 +17,7 @@ public final class ArrivalWidget extends AppWidgetProvider {
             SharedPreferences prefs=AppRuntime.prefs(context);
             if(prefs.getBoolean("monitoring",false)) {
                 if(Intent.ACTION_BOOT_COMPLETED.equals(action)) AppRuntime.proximityEvent(context,"Restarted after the phone restarted");
-                context.startForegroundService(new Intent(context,MonitorService.class).putExtra("mode",prefs.getString("monitorMode","gps")));
+                context.startForegroundService(new Intent(context,MonitorService.class));
             }
             else AppRuntime.setProximity(context,false,"Off",System.currentTimeMillis());
             return;

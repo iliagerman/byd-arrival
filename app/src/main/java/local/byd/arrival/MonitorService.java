@@ -12,10 +12,14 @@ import android.net.*;
 import android.os.*;
 import java.util.*;
 
-/** Arrival trigger, screen off included: GPS distance to the parked car ("gps") or a BLE beacon ("ble"). */
+/**
+ * Arrival trigger, screen off included: GPS distance to the parked car, and the car's Bluetooth beacons when any are
+ * chosen. Whichever comes first starts the car; the other then counts as having fired too.
+ */
 public final class MonitorService extends Service {
     private int fireMetres, rearmMetres;
-    private String active;
+    /** onStartCommand ran: Android may call it again for a running service. */
+    private boolean running;
     private double carLatitude, carLongitude;
     private ProximityGate proximity;
     private LocationManager locations;
@@ -42,41 +46,45 @@ public final class MonitorService extends Service {
         @Override public void onLost(Network network) { handler.post(()->currentWifi=null); }
     };
     private BluetoothLeScanner scanner;
-    private ArrivalGate gate;
-    private long started;
+    private List<Beacons.Beacon> beacons=List.of();
+    /** Null while no beacon is being watched. */
+    private ArrivalGate beaconGate;
+    private List<ScanFilter> filters;
+    private long started, scanEveryMs;
     private final Handler handler=new Handler(Looper.getMainLooper());
+    /** Once a second: a beacon out of range long enough arms the Bluetooth trigger. It never runs the walk-away action,
+     *  because the beacon also leaves when someone else drives the car away. */
     private final Runnable tick=new Runnable() {
         @Override public void run() {
-            if(gate.tick(SystemClock.elapsedRealtime()-started)) leave(AppRuntime.leaveAction(MonitorService.this));
+            if(beaconGate.tick(SystemClock.elapsedRealtime()-started)) {
+                AppRuntime.proximityEvent(MonitorService.this,"Armed by Bluetooth: the beacon was out of range");
+                showProximity(lastDistance,lastDistanceAt);
+            }
             handler.postDelayed(this,1000);
         }
     };
     private final ScanCallback callback=new ScanCallback() {
         @Override public void onScanResult(int type,ScanResult result) {
-            if(gate.observe(SystemClock.elapsedRealtime()-started,result.getRssi())) arrival();
+            ScanRecord record=result.getScanRecord();
+            String id=Beacons.idFor(result.getDevice().getAddress(),record==null?null:record.getManufacturerSpecificData(0x004C));
+            for(Beacons.Beacon beacon:beacons) if(beacon.id.equals(id)) beaconSeen(beacon,result.getRssi());
         }
         @Override public void onBatchScanResults(List<ScanResult> results) {
             // Delayed batches do not prove current proximity. Only fresh live sightings count.
         }
         @Override public void onScanFailed(int code) {
-            AppRuntime.status(MonitorService.this,"Bluetooth scan failed ("+code+"). Monitoring stopped."); stopSelf();
+            AppRuntime.note(MonitorService.this,"Bluetooth scan failed ("+code+"): beacons paused; the start distance still works.");
         }
     };
-    /** Sticky: if Android ends the app while monitoring, it restarts this service with no intent, in the mode last used. */
+    /** Sticky: if Android ends the app while monitoring, it restarts this service with no intent. */
     @Override public int onStartCommand(Intent intent,int flags,int startId) {
         if(intent!=null && "STOP".equals(intent.getAction())) { AppRuntime.stopMonitoring(this); return START_NOT_STICKY; }
-        if(active!=null) return START_STICKY;
+        if(running) return START_STICKY;
+        running=true;
         if(intent==null) AppRuntime.proximityEvent(this,"Restarted after Android stopped the app");
-        active=intent!=null?intent.getStringExtra("mode"):AppRuntime.prefs(this).getString("monitorMode","gps");
-        AppRuntime.prefs(this).edit().putString("monitorMode",active).putBoolean("monitoring",true).apply();
-        boolean gps="gps".equals(active);
-        startForeground(11,AppRuntime.notification(this,"Monitoring the car. Tap Stop to disable.","monitor"),
-            gps?ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION:ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE);
-        try {
-            if(gps) startGps(); else startBle();
-        } catch(Exception error) {
-            AppRuntime.status(this,"Cannot monitor: "+error.getMessage()); stopSelf();
-        }
+        AppRuntime.prefs(this).edit().putBoolean("monitoring",true).apply();
+        startForeground(11,AppRuntime.notification(this,"Monitoring the car. Tap Stop to disable.","monitor"),ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
+        startGps();
         return START_STICKY;
     }
     /** GPS mode first reads the car's position from BYD, then tracks the phone against it. Paused, BYD isn't asked. */
@@ -132,7 +140,8 @@ public final class MonitorService extends Service {
         }
         connectivity=getSystemService(ConnectivityManager.class);
         connectivity.registerNetworkCallback(new NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build(),wifiCallback);
-        AppRuntime.status(this,"Location monitoring on.");
+        startBeacons();
+        AppRuntime.status(this,beaconGate==null?"Location monitoring on.":"Location and Bluetooth monitoring on.");
     }
     /** Abroad mode, switched on by hand: nothing is tracked or asked until it's switched off in Settings. */
     private void beginAbroad() {
@@ -142,6 +151,7 @@ public final class MonitorService extends Service {
     }
     /** Stops location readings and Wi-Fi arming, before switching between normal and paused tracking. */
     private void stopTracking() {
+        stopBeacons();
         if(fusedListener!=null) locations.removeUpdates(fusedListener);
         if(satelliteListener!=null) locations.removeUpdates(satelliteListener);
         fusedListener=null; satelliteListener=null;
@@ -217,6 +227,7 @@ public final class MonitorService extends Service {
             return;
         }
         AppRuntime.prefs(this).edit().putLong("lastAutoStartAt",System.currentTimeMillis()).putBoolean("gateArmed",false).commit();
+        if(beaconGate!=null) beaconGate.disarm();
         AppRuntime.proximityEvent(this,"Triggered at "+metres+" m");
         arrival();
     }
@@ -339,6 +350,7 @@ public final class MonitorService extends Service {
             return;
         }
         proximity.arm();
+        if(beaconGate!=null) beaconGate.arm();
         AppRuntime.prefs(this).edit().putBoolean("gateArmed",true).commit();
         AppRuntime.proximityEvent(this,"Armed by Wi-Fi "+name+": "+signal+" dBm");
         showProximity(lastDistance,lastDistanceAt);
@@ -352,40 +364,76 @@ public final class MonitorService extends Service {
     /** at: when the shown reading was taken, so the widget's time is the reading's, not the refresh's. */
     private void showProximity(String distance,long at) {
         lastDistance=distance; lastDistanceAt=at;
-        AppRuntime.setProximity(this,proximity.armed(),distance,at);
+        // Armed when either trigger can start the car.
+        AppRuntime.setProximity(this,proximity.armed() || beaconGate!=null && beaconGate.armed(),distance,at);
     }
-    private void startBle() {
-        if(Build.VERSION.SDK_INT>=31 && checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN)!=PackageManager.PERMISSION_GRANTED)
-            throw new IllegalStateException("Missing Bluetooth permission");
-        String address=AppRuntime.prefs(this).getString("beacon","");
-        if(!BluetoothAdapter.checkBluetoothAddress(address)) throw new IllegalStateException("Select a BLE signal");
+    /** The car's Bluetooth beacons, if any were chosen in Settings: a strong signal starts the car like the start distance. */
+    private void startBeacons() {
+        beacons=AppRuntime.beacons(this);
+        if(beacons.isEmpty()) return;
+        if(checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN)!=PackageManager.PERMISSION_GRANTED) {
+            AppRuntime.note(this,"Beacons ignored: allow Nearby devices for this app."); return;
+        }
         BluetoothAdapter adapter=getSystemService(BluetoothManager.class).getAdapter();
-        if(adapter==null || !adapter.isEnabled()) throw new IllegalStateException("Bluetooth is off");
+        if(adapter==null || !adapter.isEnabled()) { AppRuntime.note(this,"Beacons ignored: Bluetooth is off."); return; }
         scanner=adapter.getBluetoothLeScanner();
         started=SystemClock.elapsedRealtime();
         int seconds=AppRuntime.intervalSeconds(this);
-        long absent=AutoStartSettings.beaconAbsentMillis(seconds);
-        gate=new ArrivalGate(AppRuntime.prefs(this).getInt("rssi",-65),absent);
-        filters=List.of(new ScanFilter.Builder().setDeviceAddress(address).build());
-        if(seconds<AutoStartSettings.SCAN_ROUNDS_FROM_SECONDS) startScan(); else scanRound(seconds*1000L);
+        beaconGate=new ArrivalGate(AutoStartSettings.beaconAbsentMillis(seconds));
+        // Filters are required: Android stops delivering unfiltered scan results while the screen is off.
+        filters=new ArrayList<>();
+        byte[] mask=new byte[22];
+        Arrays.fill(mask,(byte)0xff);
+        for(Beacons.Beacon beacon:beacons) {
+            byte[] iBeacon=Beacons.iBeaconFilter(beacon.id);
+            filters.add(iBeacon!=null?new ScanFilter.Builder().setManufacturerData(0x004C,iBeacon,mask).build()
+                :new ScanFilter.Builder().setDeviceAddress(Beacons.address(beacon.id)).build());
+        }
+        scanEveryMs=seconds*1000L;
+        if(seconds<AutoStartSettings.SCAN_ROUNDS_FROM_SECONDS) startScan(); else handler.post(scanRound);
         handler.post(tick);
-        AppRuntime.status(this,"Bluetooth monitoring started. Leave signal range for "+absent/1000+" seconds before approaching.");
     }
-    private List<ScanFilter> filters;
-    /** Permission was checked in startBle; Android ends the app if it is revoked. */
+    /**
+     * A sighting of a chosen beacon, as its margin over the calibrated strength. The beacon is in the car, so a strong
+     * signal proves the car is here: unlike the start distance, BYD isn't asked first.
+     */
+    private void beaconSeen(Beacons.Beacon beacon,int rssi) {
+        if(beaconGate==null) return;
+        boolean mayStart=cooldownPassed() && !onTrustedWifi() && !verifying && SystemClock.elapsedRealtime()-lastFastAt>=15000;
+        if(!beaconGate.observe(SystemClock.elapsedRealtime()-started,rssi-beacon.threshold,mayStart)) return;
+        proximity.startedByBeacon();
+        AppRuntime.prefs(this).edit().putLong("lastAutoStartAt",System.currentTimeMillis()).putBoolean("gateArmed",false).commit();
+        AppRuntime.proximityEvent(this,"Triggered by Bluetooth: "+beacon.label+" at "+rssi+" dBm");
+        showProximity(lastDistance,lastDistanceAt);
+        arrival();
+    }
+    /** Permission was checked in startBeacons; Android ends the app if it is revoked. */
     @android.annotation.SuppressLint("MissingPermission")
     private void startScan() {
         scanner.startScan(filters,new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).setReportDelay(0).build(),callback);
     }
+    @android.annotation.SuppressLint("MissingPermission")
+    private void stopScan() {
+        try { scanner.stopScan(callback); }
+        catch(IllegalStateException bluetoothTurnedOff) { /* nothing is scanning then */ }
+    }
+    private final Runnable stopRound=this::stopScan;
     /**
      * Scans for 5 seconds every interval, enough for several sightings of the beacon. Rounds start at least
      * 10 seconds apart, because Android blocks apps that start a scan more than 5 times in 30 seconds.
      */
-    @android.annotation.SuppressLint("MissingPermission")
-    private void scanRound(long everyMs) {
-        startScan();
-        handler.postDelayed(()->scanner.stopScan(callback),5000);
-        handler.postDelayed(()->scanRound(everyMs),everyMs);
+    private final Runnable scanRound=new Runnable() {
+        @Override public void run() {
+            startScan();
+            handler.postDelayed(stopRound,5000);
+            handler.postDelayed(this,scanEveryMs);
+        }
+    };
+    private void stopBeacons() {
+        if(beaconGate==null) return;
+        handler.removeCallbacks(tick); handler.removeCallbacks(scanRound); handler.removeCallbacks(stopRound);
+        stopScan();
+        beaconGate=null;
     }
     private void stopWithStatus(String message) { AppRuntime.status(this,message); stopSelf(); }
     /** A failure here doesn't stop monitoring: the trigger is armed, so it can't repeat before your next arrival. */
@@ -398,12 +446,6 @@ public final class MonitorService extends Service {
         stopped=true;
         handler.removeCallbacksAndMessages(null);
         stopTracking();
-        try {
-            if(scanner!=null && (Build.VERSION.SDK_INT<31 || checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN)==PackageManager.PERMISSION_GRANTED))
-                scanner.stopScan(callback);
-        } catch(IllegalStateException ignored) {
-            // Bluetooth can be disabled externally while the service is stopping.
-        }
         AppRuntime.setProximity(this,false,"Off",System.currentTimeMillis());
         super.onDestroy();
     }

@@ -130,6 +130,8 @@ final class AppRuntime {
         String name=((WifiInfo)caps.getTransportInfo()).getSSID().replace("\"","");
         return name.equals("<unknown ssid>")?null:name;
     }
+    static List<Beacons.Beacon> beacons(Context c) { return Beacons.parse(prefs(c).getString("beacons","[]")); }
+    static void setBeacons(Context c,List<Beacons.Beacon> beacons) { prefs(c).edit().putString("beacons",Beacons.toJson(beacons)).apply(); }
     static Set<String> trustedWifi(Context c) { return new HashSet<>(prefs(c).getStringSet("trustedWifi",Set.of())); }
     static void setTrustedWifi(Context c,Set<String> names) { prefs(c).edit().putStringSet("trustedWifi",new HashSet<>(names)).apply(); }
     /** Proximity indicator for the app and widget, stamped with the time of the reading it shows (at). */

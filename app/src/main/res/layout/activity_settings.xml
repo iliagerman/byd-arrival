@@ -68,6 +68,20 @@
 
         <TextView style="@style/SectionHeader" android:text="@string/section_auto" />
         <LinearLayout style="@style/Card">
+            <TextView style="@style/CardTitle" android:text="@string/beacon_title" />
+            <TextView style="@style/Body" android:text="@string/beacon_body" />
+            <TextView style="@style/FieldLabel" android:text="@string/your_beacons" />
+            <TextView android:id="@+id/beacon_none" style="@style/Body" android:text="@string/beacon_none" />
+            <LinearLayout android:id="@+id/beacon_list" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:orientation="vertical" />
+            <Button android:id="@+id/scan" style="@style/ButtonTonal" android:text="@string/scan" />
+            <TextView style="@style/FieldLabel" android:text="@string/nearby_title" />
+            <TextView android:id="@+id/nearby_none" style="@style/Body" android:text="@string/nearby_idle" />
+            <LinearLayout android:id="@+id/nearby_list" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:orientation="vertical" />
+        </LinearLayout>
+
+        <LinearLayout style="@style/Card">
             <TextView style="@style/CardTitle" android:text="@string/arrival_title" />
             <TextView style="@style/Body" android:text="@string/arrival_body" />
             <TextView style="@style/FieldLabel" android:text="@string/arrival_action" />
@@ -113,19 +127,6 @@
         </LinearLayout>
 
         <TextView style="@style/SectionHeader" android:text="@string/section_more" />
-        <LinearLayout style="@style/Card">
-            <TextView style="@style/CardTitle" android:text="@string/beacon_title" />
-            <TextView style="@style/Body" android:text="@string/beacon_body" />
-            <TextView android:id="@+id/beacon" style="@style/Body" android:layout_marginTop="8dp"
-                android:textColor="@color/on_surface" />
-            <Button android:id="@+id/scan" style="@style/ButtonTonal" android:text="@string/scan" />
-            <LinearLayout android:id="@+id/devices" android:layout_width="match_parent"
-                android:layout_height="wrap_content" android:orientation="vertical" />
-            <TextView style="@style/FieldLabel" android:text="@string/threshold" />
-            <EditText android:id="@+id/rssi" style="@style/Field" android:layout_marginTop="4dp" android:inputType="numberSigned" android:maxLength="3" />
-            <Button android:id="@+id/monitor_ble" style="@style/ButtonTonal" android:text="@string/monitor_ble" />
-        </LinearLayout>
-
         <LinearLayout style="@style/Card">
             <TextView style="@style/CardTitle" android:text="@string/phone_title" />
             <TextView android:id="@+id/app_version" style="@style/Body" />

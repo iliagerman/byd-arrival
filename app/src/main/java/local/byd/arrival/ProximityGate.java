@@ -23,6 +23,8 @@ public final class ProximityGate {
     public boolean visited() { return visited; }
     /** The car's spot changed without you: being near the old spot no longer counts as having been at the car. */
     public void spotChanged() { visited=false; }
+    /** A beacon in the car started it: you're at the car, and this trigger doesn't start it again. */
+    public void startedByBeacon() { armed=false; visited=true; }
     /** Arms the trigger without a distance reading, e.g. when a trusted Wi-Fi is joined. */
     public void arm() { armed = true; }
     /**

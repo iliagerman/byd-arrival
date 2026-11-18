@@ -54,22 +54,22 @@ public final class WelcomeActivity extends Activity {
         summary.setText(getString(R.string.welcome_summary,values.start,values.rearm,values.minutes));
     }
     private void turnOn() {
-        if(Permissions.gpsReady(this)) startMonitoring("gps"); else Permissions.askNext(this);
+        if(Permissions.gpsReady(this)) startMonitoring(); else Permissions.askNext(this);
     }
     @Override public void onRequestPermissionsResult(int code,String[] permissions,int[] results) {
-        if(Permissions.gpsReady(this)) { startMonitoring("gps"); return; }
+        if(Permissions.gpsReady(this)) { startMonitoring(); return; }
         if(Permissions.allGranted(results)) { Permissions.askNext(this); return; }
         Toast.makeText(this,R.string.welcome_location_needed,Toast.LENGTH_LONG).show();
         setResult(DECLINED); finish();
     }
-    private void startMonitoring(String mode) {
+    private void startMonitoring() {
         stopService(new Intent(this,MonitorService.class));
-        startForegroundService(new Intent(this,MonitorService.class).putExtra("mode",mode));
+        startForegroundService(new Intent(this,MonitorService.class));
         finish();
     }
     /** A monitor already running keeps its old values until restarted, so new values restart it. */
     private void notNow() {
         SharedPreferences prefs=AppRuntime.prefs(this);
-        if(saved && prefs.getBoolean("monitoring",false)) startMonitoring(prefs.getString("monitorMode","gps")); else finish();
+        if(saved && prefs.getBoolean("monitoring",false)) startMonitoring(); else finish();
     }
 }
