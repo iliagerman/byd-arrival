@@ -8,7 +8,7 @@ import java.util.function.IntConsumer;
 
 /**
  * Settings card for the smart Start car: engine-on time, the five temperature ranges (where each starts, A/C, fan,
- * seat heat) and the A/C on temperature. Numbers are set with − and + so they can't be invalid, and every change
+ * seat heat off, low or high) and the A/C on temperature. Numbers are set with − and + so they can't be invalid, and every change
  * is saved straight away.
  */
 final class StartSettings {
@@ -54,13 +54,10 @@ final class StartSettings {
             delta->save(plan.withLevel(index,plan.level(index).withTemperature(plan.level(index).temperature+delta))));
         stepper(view.findViewById(R.id.level_fan),R.string.level_fan,
             delta->save(plan.withLevel(index,plan.level(index).withFan(plan.level(index).fan+delta))));
-        CheckBox driver=view.findViewById(R.id.level_driver), passenger=view.findViewById(R.id.level_passenger);
-        driver.setChecked(plan.level(index).driverSeat);
-        passenger.setChecked(plan.level(index).passengerSeat);
-        CompoundButton.OnCheckedChangeListener seats=(button,checked)->
-            save(plan.withLevel(index,plan.level(index).withSeats(driver.isChecked(),passenger.isChecked())));
-        driver.setOnCheckedChangeListener(seats);
-        passenger.setOnCheckedChangeListener(seats);
+        stepper(view.findViewById(R.id.level_driver),R.string.level_driver,
+            delta->save(plan.withLevel(index,plan.level(index).withHeat(plan.level(index).driverHeat+delta,plan.level(index).passengerHeat))));
+        stepper(view.findViewById(R.id.level_passenger),R.string.level_passenger,
+            delta->save(plan.withLevel(index,plan.level(index).withHeat(plan.level(index).driverHeat,plan.level(index).passengerHeat+delta))));
     }
     /** Wires − and + to change(−1) and change(+1); the change saves, then everything is shown again. */
     private void stepper(View row,int label,IntConsumer change) {
@@ -82,6 +79,8 @@ final class StartSettings {
             if(i>0) value(view.findViewById(R.id.level_from),plan.from(i)+" °C");
             value(view.findViewById(R.id.level_temp),level.temperature+" °C");
             value(view.findViewById(R.id.level_fan),String.valueOf(level.fan));
+            value(view.findViewById(R.id.level_driver),ClimatePlan.HEAT[level.driverHeat]);
+            value(view.findViewById(R.id.level_passenger),ClimatePlan.HEAT[level.passengerHeat]);
         }
         value(activity.findViewById(R.id.temperature),fixedTemperature()+" °C");
     }

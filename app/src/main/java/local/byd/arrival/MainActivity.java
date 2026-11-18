@@ -19,6 +19,8 @@ public final class MainActivity extends Activity implements SharedPreferences.On
     private ImageView proxIcon;
     private ProgressBar progress;
     private View setup;
+    /** The history last shown, so the list is rebuilt only when it changes, not on every distance update. */
+    private String shownHistory;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -88,6 +90,28 @@ public final class MainActivity extends Activity implements SharedPreferences.On
         progress.setVisibility(busy?View.VISIBLE:View.GONE);
         setup.setVisibility(ready?View.GONE:View.VISIBLE);
         for(View action:actions) { action.setEnabled(ready && !busy); action.setAlpha(ready && !busy?1f:0.4f); }
+        showHistory();
+    }
+    /** Recent actions, newest first: when, the trigger, what ran, and the outcome (green ✓, red ✗, grey – not sent). */
+    private void showHistory() {
+        String json=AppRuntime.prefs(this).getString("history","[]");
+        if(json.equals(shownHistory)) return;
+        shownHistory=json;
+        List<History.Entry> entries=History.parse(json);
+        LinearLayout list=findViewById(R.id.history_list);
+        list.removeAllViews();
+        findViewById(R.id.history_none).setVisibility(entries.isEmpty()?View.VISIBLE:View.GONE);
+        for(History.Entry entry:entries) {
+            View row=getLayoutInflater().inflate(R.layout.history_row,list,false);
+            ((TextView)row.findViewById(R.id.history_when)).setText(android.text.format.DateFormat.format("EEE d MMM, HH:mm:ss",entry.at));
+            ((TextView)row.findViewById(R.id.history_trigger)).setText(entry.trigger);
+            ((TextView)row.findViewById(R.id.history_actions)).setText(entry.actions);
+            TextView result=row.findViewById(R.id.history_result);
+            boolean ok=entry.outcome.equals(History.OK), failed=entry.outcome.equals(History.FAIL);
+            result.setText((ok?"✓ ":failed?"✗ ":"– ")+entry.result);
+            result.setTextColor(getColor(ok?R.color.ok:failed?R.color.danger:R.color.muted));
+            list.addView(row);
+        }
     }
     /** Every action except Start car (the big button), then custom actions, then Locate car. Rebuilt so new custom actions show. */
     private void buildTiles() {
@@ -106,7 +130,7 @@ public final class MainActivity extends Activity implements SharedPreferences.On
         grid.addView(tile); actions.add(tile);
     }
     private void send(String action) {
-        startForegroundService(new Intent(this,CommandService.class).putExtra("actions",action));
+        startForegroundService(new Intent(this,CommandService.class).putExtra("actions",action).putExtra("trigger","App"));
     }
     private void locate() {
         AppRuntime.note(this,"Asking the car for its location…");

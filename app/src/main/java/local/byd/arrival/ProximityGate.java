@@ -70,6 +70,15 @@ public final class ProximityGate {
     public static boolean movingFast(boolean hasSpeed,float metresPerSecond,float accuracyMetres,double rearmMetres) {
         return hasSpeed && metresPerSecond>3.5f && accuracyMetres<=rearmMetres;
     }
+    /**
+     * After the beacon went: BYD's position for the car must be within this distance (plus that reading's accuracy) of
+     * where your phone was when the beacon was last at full strength, i.e. where you left the car. Farther, it was driven
+     * off after you parted, e.g. your wife after dropping you off.
+     */
+    static final double SAME_SPOT_METRES=50;
+    public static boolean leftWhereYouWere(double carToWhereYouWereMetres,float accuracyMetres) {
+        return carToWhereYouWereMetres<=SAME_SPOT_METRES+accuracyMetres;
+    }
     /** Before unlocking on arrival: BYD's position for the car must be within the start distance of you, plus 30 m of GPS error. */
     public static boolean carIsHere(double phoneToCarMetres,double fireMetres) { return phoneToCarMetres<=fireMetres+30; }
     /**

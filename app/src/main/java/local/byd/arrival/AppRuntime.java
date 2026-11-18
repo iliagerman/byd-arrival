@@ -213,11 +213,16 @@ final class AppRuntime {
     /**
      * Runs actions (built-in codes or custom ids) once: verifies the stored PIN, then each step, no retries. Automatic
      * actions (retryUnsent) are tried once more after 20 seconds if the network failed before any command was sent.
-     * Records the pressed action and its result (busy, ok, fail) for the widget's badge.
+     * Records the pressed action and its result (busy, ok, fail) for the widget's badge, and in Recent actions with
+     * its trigger (App, Widget, Bluetooth, distance, walk-away…).
      */
-    static void execute(Context context,List<String> actions,boolean automation,boolean retryUnsent,Runnable finished) {
+    static void execute(Context context,List<String> actions,String trigger,boolean automation,boolean retryUnsent,Runnable finished) {
         Context c=context.getApplicationContext();
-        if(!BUSY.compareAndSet(false,true)) { status(c,"Already running; duplicate ignored."); finished.run(); return; }
+        if(!BUSY.compareAndSet(false,true)) {
+            status(c,"Already running; duplicate ignored.");
+            record(c,trigger,actions,History.SKIPPED,"Not sent: another action was still running.");
+            finished.run(); return;
+        }
         // pref change wakes UI listeners; BUSY is the truth
         prefs(c).edit().putBoolean("busy",true).putString("lastAction",String.join(",",actions)).putString("lastResult","busy").apply();
         IO.execute(()-> {
@@ -237,23 +242,33 @@ final class AppRuntime {
                 prefs(c).edit().putString("lastResult","ok").apply();
                 refreshBattery(c,()->{}); // the car is awake now, so its battery level is current
                 status(c,"Done: "+Actions.labels(actions,customs)+(notes.isEmpty()?"":" ("+String.join(", ",notes)+")")+". Confirmed by BYD.");
+                record(c,trigger,actions,History.OK,"Confirmed by BYD."+(notes.isEmpty()?"":" "+String.join(", ",notes)+"."));
             } catch(Exception error) {
                 clearSession();
                 if(retryUnsent && Routine.retryable(error,commandsStarted)) {
                     // Seen 20:16: Walk away timed out while checking the PIN, and the car was left on.
                     status(c,"Network problem before anything reached the car ("+error.getClass().getSimpleName()+"); trying once more in 20 seconds.");
-                    MAIN.postDelayed(()->execute(c,actions,automation,false,finished),20000);
+                    MAIN.postDelayed(()->execute(c,actions,trigger,automation,false,finished),20000);
                     return;
                 }
                 prefs(c).edit().putString("lastResult","fail").apply();
                 if(automation) stopMonitoring(c);
                 status(c,safeError(error)+(automation?" Automation stopped.":""));
+                record(c,trigger,actions,History.FAIL,safeError(error)+(automation?" Automation stopped.":""));
             } finally {
                 if(wake.isHeld()) wake.release();
                 BUSY.set(false); prefs(c).edit().putBoolean("busy",false).apply(); finished.run();
             }
         });
     }
+    /** Adds an entry at the top of Recent actions. Synchronized: actions and the monitor record from different threads. */
+    static synchronized void record(Context c,String trigger,List<String> actions,String outcome,String result) {
+        List<History.Entry> entries=History.add(history(c),
+            new History.Entry(System.currentTimeMillis(),trigger,Actions.labels(actions,customs(c)),outcome,result));
+        prefs(c).edit().putString("history",History.toJson(entries)).apply();
+        log(c,"recent action: "+trigger+" · "+Actions.labels(actions,customs(c))+" · "+outcome+" · "+result);
+    }
+    static List<History.Entry> history(Context c) { return History.parse(prefs(c).getString("history","[]")); }
     private static void runStep(Context c,BydApi client,String vin,String step,List<String> notes) throws Exception {
         switch(step) {
             case "START": smartStart(c,client,vin,notes); return;
@@ -268,7 +283,7 @@ final class AppRuntime {
             case "SEAT_DRIVER": case "SEAT_PASSENGER": {
                 JSONObject climate=client.climate(vin);
                 boolean driver=step.equals("SEAT_DRIVER");
-                seatHeat(c,client,vin,climate,driver,!driver);
+                seatHeat(c,client,vin,climate,driver?ClimatePlan.HIGH:ClimatePlan.OFF,driver?ClimatePlan.OFF:ClimatePlan.HIGH);
                 return;
             }
             default:
@@ -296,9 +311,9 @@ final class AppRuntime {
         status(c,"Starting: "+level.name.toLowerCase(Locale.ROOT)+", A/C "+level.temperature+" °C, fan "+level.fan+"…");
         client.command(vin,"OPENAIR",BydApi.climateParams(level.temperature,climate.getInt("vdeTempRangeMin"),level.fan,engineMinutes(c)));
         notes.add(source+" → "+level.name+": A/C "+level.temperature+" °C, fan "+level.fan);
-        if(level.driverSeat || level.passengerSeat) {
-            seatHeat(c,client,vin,climate,level.driverSeat,level.passengerSeat);
-            notes.add("seat heat "+(level.driverSeat && level.passengerSeat?"both":level.driverSeat?"driver":"passenger"));
+        if(level.driverHeat!=ClimatePlan.OFF || level.passengerHeat!=ClimatePlan.OFF) {
+            seatHeat(c,client,vin,climate,level.driverHeat,level.passengerHeat);
+            notes.add("seat heat: driver "+ClimatePlan.HEAT[level.driverHeat].toLowerCase(Locale.ROOT)+", passenger "+ClimatePlan.HEAT[level.passengerHeat].toLowerCase(Locale.ROOT));
         }
     }
     /**
@@ -346,11 +361,22 @@ final class AppRuntime {
     }
     /** The car reports -129 °C when it has no reading. */
     private static final int NO_READING=-129;
-    /** Turns on heat for the chosen seats, one command per seat, keeping the other seat as the car reported it. */
-    private static void seatHeat(Context c,BydApi client,String vin,JSONObject climate,boolean driver,boolean passenger) throws Exception {
+    /**
+     * Turns on heat (ClimatePlan.LOW or HIGH) for the seats not OFF, one command per seat, keeping the other seat as the
+     * car reported it. OFF leaves that seat as it is.
+     */
+    private static void seatHeat(Context c,BydApi client,String vin,JSONObject climate,int driver,int passenger) throws Exception {
         int main=BydApi.seatCommandLevel(climate.optInt("mainSeatHeatState",0));
         int copilot=BydApi.seatCommandLevel(climate.optInt("copilotSeatHeatState",0));
-        if(driver) { main=1; status(c,"Heating driver seat…"); client.command(vin,"VENTILATIONHEATING",BydApi.seatParams("1",main,copilot)); }
-        if(passenger) { copilot=1; status(c,"Heating passenger seat…"); client.command(vin,"VENTILATIONHEATING",BydApi.seatParams("2",main,copilot)); }
+        if(driver!=ClimatePlan.OFF) {
+            main=BydApi.seatHeatCommand(driver);
+            status(c,"Heating driver seat ("+ClimatePlan.HEAT[driver].toLowerCase(Locale.ROOT)+")…");
+            client.command(vin,"VENTILATIONHEATING",BydApi.seatParams("1",main,copilot));
+        }
+        if(passenger!=ClimatePlan.OFF) {
+            copilot=BydApi.seatHeatCommand(passenger);
+            status(c,"Heating passenger seat ("+ClimatePlan.HEAT[passenger].toLowerCase(Locale.ROOT)+")…");
+            client.command(vin,"VENTILATIONHEATING",BydApi.seatParams("2",main,copilot));
+        }
     }
 }

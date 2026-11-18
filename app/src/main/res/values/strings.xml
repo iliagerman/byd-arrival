@@ -48,6 +48,8 @@
     <string name="temperature_title">A/C on button</string>
     <string name="temperature_label">A/C temperature</string>
     <string name="engine_minutes">Engine-on time</string>
+    <string name="history_title">Recent actions</string>
+    <string name="history_none">Nothing yet. Each action shows here with what triggered it: the app, the widget, Bluetooth, the distance or walking away.</string>
     <string name="level_driver">Driver seat heat</string>
     <string name="level_passenger">Passenger seat heat</string>
     <string name="section_actions">ACTIONS</string>

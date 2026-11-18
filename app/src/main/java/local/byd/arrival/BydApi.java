@@ -151,11 +151,17 @@ public final class BydApi {
             poll.put("requestSerial",data.optString("requestSerial"));
             data=(JSONObject)request("/vehicleInfo/vehicle/vehicleRealTimeResult",poll);
         }
-        if(!realtimeReady(data)) throw new IOException("BYD battery level not reported by car");
+        if(!realtimeReady(data)) throw new IOException("BYD live data not reported by car");
         return data;
     }
     /** pyBYD's rule: the answer holds data once it has a report time or a range. */
     static boolean realtimeReady(JSONObject data) { return data.optLong("time",0)>0 || data.optDouble("enduranceMileage",0)>0; }
+    /**
+     * From live data: the car reports standing still (speed exactly 0). Moving, or speed not reported, means someone may
+     * be driving it, so the walk-away action isn't sent. Being switched on (powerGear 3) doesn't count: remote A/C looks
+     * the same, and turning off a car left on is what walking away is for.
+     */
+    static boolean standingStill(JSONObject data) { return data.optDouble("speed",-1)==0; }
     /** Battery level in percent, or -1 when the car sent none (BYD uses -1 after the car wakes or sleeps deeply). */
     static int batteryPercent(JSONObject data) {
         double percent=data.optDouble("elecPercent",-1);
@@ -233,6 +239,12 @@ public final class BydApi {
                 "rrSeatHeatState","rrSeatVentilationState","rrThirdHeatState","rrThirdVentilationState")) seats.put(rear,0);
         seats.put("steeringWheelHeatState",0);
         return seats;
+    }
+    /** A seat heat setting (ClimatePlan.LOW or HIGH) to the command scale: 2=low, 1=high. */
+    static int seatHeatCommand(int heat) {
+        if(heat==ClimatePlan.HIGH) return 1;
+        if(heat==ClimatePlan.LOW) return 2;
+        throw new IllegalArgumentException("Seat heat off sends no command");
     }
     /** Seat status (1=off, 2=low, 3=high) to the command scale (3=off, 2=low, 1=high); anything else is 0 (no change). */
     static int seatCommandLevel(int status) {

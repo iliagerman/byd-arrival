@@ -61,5 +61,12 @@
 
         <GridLayout android:id="@+id/grid" android:layout_width="match_parent" android:layout_height="wrap_content"
             android:layout_marginHorizontal="-6dp" android:layout_marginTop="12dp" android:columnCount="2" />
+
+        <LinearLayout style="@style/Card">
+            <TextView style="@style/CardTitle" android:text="@string/history_title" />
+            <TextView android:id="@+id/history_none" style="@style/Body" android:text="@string/history_none" />
+            <LinearLayout android:id="@+id/history_list" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:orientation="vertical" />
+        </LinearLayout>
     </LinearLayout>
 </ScrollView>

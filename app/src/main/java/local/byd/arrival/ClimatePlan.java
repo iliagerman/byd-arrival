@@ -11,20 +11,25 @@ public final class ClimatePlan {
     public static final int MIN_AC = 17, MAX_AC = 33, MIN_FAN = 1, MAX_FAN = 7, MIN_BORDER = -20, MAX_BORDER = 45;
     public static final String[] NAMES = {"Freezing", "Cold", "Mild", "Warm", "Hot"};
     public static final int MILD = 2;
+    /** Seat heat per seat: OFF, LOW or HIGH. */
+    public static final int OFF = 0, LOW = 1, HIGH = 2;
+    public static final String[] HEAT = {"Off", "Low", "High"};
 
     public static final class Level {
         public final String name;
         public final int temperature, fan;
-        public final boolean driverSeat, passengerSeat;
-        public Level(String name, int temperature, int fan, boolean driverSeat, boolean passengerSeat) {
+        /** OFF, LOW or HIGH. */
+        public final int driverHeat, passengerHeat;
+        public Level(String name, int temperature, int fan, int driverHeat, int passengerHeat) {
             if (temperature < MIN_AC || temperature > MAX_AC) throw new IllegalArgumentException(name + ": A/C temperature must be " + MIN_AC + "–" + MAX_AC + " °C");
             if (fan < MIN_FAN || fan > MAX_FAN) throw new IllegalArgumentException(name + ": fan speed must be " + MIN_FAN + "–" + MAX_FAN);
             this.name = name; this.temperature = temperature; this.fan = fan;
-            this.driverSeat = driverSeat; this.passengerSeat = passengerSeat;
+            if (driverHeat < OFF || driverHeat > HIGH || passengerHeat < OFF || passengerHeat > HIGH) throw new IllegalArgumentException(name + ": seat heat must be off, low or high");
+            this.driverHeat = driverHeat; this.passengerHeat = passengerHeat;
         }
-        public Level withTemperature(int celsius) { return new Level(name, clamp(celsius, MIN_AC, MAX_AC), fan, driverSeat, passengerSeat); }
-        public Level withFan(int speed) { return new Level(name, temperature, clamp(speed, MIN_FAN, MAX_FAN), driverSeat, passengerSeat); }
-        public Level withSeats(boolean driver, boolean passenger) { return new Level(name, temperature, fan, driver, passenger); }
+        public Level withTemperature(int celsius) { return new Level(name, clamp(celsius, MIN_AC, MAX_AC), fan, driverHeat, passengerHeat); }
+        public Level withFan(int speed) { return new Level(name, temperature, clamp(speed, MIN_FAN, MAX_FAN), driverHeat, passengerHeat); }
+        public Level withHeat(int driver, int passenger) { return new Level(name, temperature, fan, clamp(driver, OFF, HIGH), clamp(passenger, OFF, HIGH)); }
     }
     /** borders[i]: where level i+1 starts and level i ends. Always rising by at least 1 °C. */
     private final int[] borders;
@@ -37,11 +42,11 @@ public final class ClimatePlan {
     }
     public static ClimatePlan defaults() {
         return new ClimatePlan(new int[]{17, 20, 24, 28}, new Level[]{
-            new Level("Freezing", 26, 3, true, false),
-            new Level("Cold", 26, 3, false, false),
-            new Level("Mild", 20, 3, false, false),
-            new Level("Warm", 18, 5, false, false),
-            new Level("Hot", 17, 7, false, false)});
+            new Level("Freezing", 26, 3, HIGH, OFF),
+            new Level("Cold", 26, 3, OFF, OFF),
+            new Level("Mild", 20, 3, OFF, OFF),
+            new Level("Warm", 18, 5, OFF, OFF),
+            new Level("Hot", 17, 7, OFF, OFF)});
     }
     public Level choose(double celsius) {
         for (int i = 0; i < borders.length; i++) if (celsius < borders[i]) return levels[i];
@@ -77,13 +82,14 @@ public final class ClimatePlan {
         try {
             JSONArray out = new JSONArray();
             for (Level l : levels) out.put(new JSONObject().put("name", l.name).put("temperature", l.temperature)
-                .put("fan", l.fan).put("driverSeat", l.driverSeat).put("passengerSeat", l.passengerSeat));
+                .put("fan", l.fan).put("driverHeat", l.driverHeat).put("passengerHeat", l.passengerHeat));
             return new JSONObject().put("borders", new JSONArray(borders)).put("levels", out).toString();
         } catch (JSONException e) { throw new IllegalStateException(e); }
     }
     /**
      * Reads saved settings. Older saves are converted: four named borders, where Hot started above hotAbove (so at
-     * hotAbove + 1 for the car's whole-degree readings), and A/C temperatures down to 15 °C, which the car refuses.
+     * hotAbove + 1 for the car's whole-degree readings), A/C temperatures down to 15 °C, which the car refuses, and seat
+     * heat as on/off, where on was high.
      * Saves from before the Freezing level existed get the defaults.
      */
     public static ClimatePlan parse(String json) {
@@ -95,7 +101,7 @@ public final class ClimatePlan {
             for (int i = 0; i < levels.length; i++) {
                 JSONObject o = l.getJSONObject(i);
                 levels[i] = new Level(o.getString("name"), clamp(o.getInt("temperature"), MIN_AC, MAX_AC), o.getInt("fan"),
-                    o.getBoolean("driverSeat"), o.getBoolean("passengerSeat"));
+                    heat(o, "driverHeat", "driverSeat"), heat(o, "passengerHeat", "passengerSeat"));
             }
             if (in.has("borders")) {
                 JSONArray b = in.getJSONArray("borders");
@@ -107,6 +113,9 @@ public final class ClimatePlan {
             for (int i = 1; i < old.length; i++) old[i] = Math.max(old[i], old[i - 1] + 1);
             return new ClimatePlan(old, levels);
         } catch (JSONException e) { throw new IllegalStateException("Saved start settings are invalid", e); }
+    }
+    private static int heat(JSONObject level, String key, String oldKey) throws JSONException {
+        return level.has(key) ? level.getInt(key) : level.getBoolean(oldKey) ? HIGH : OFF;
     }
     static int clamp(int value, int min, int max) { return Math.max(min, Math.min(max, value)); }
 }

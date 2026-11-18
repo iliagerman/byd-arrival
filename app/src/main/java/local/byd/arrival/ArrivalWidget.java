@@ -76,7 +76,7 @@ public final class ArrivalWidget extends AppWidgetProvider {
         return PendingIntent.getActivity(context,requestCode,new Intent(context,screen),PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT);
     }
     private static PendingIntent action(Context context,int requestCode,String action) {
-        Intent intent=new Intent(context,CommandService.class).putExtra("actions",action);
+        Intent intent=new Intent(context,CommandService.class).putExtra("actions",action).putExtra("trigger","Widget");
         return PendingIntent.getForegroundService(context,requestCode,intent,PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT);
     }
     static void updateAll(Context context) {

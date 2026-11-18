@@ -14,7 +14,8 @@ import java.util.*;
 
 /**
  * Arrival trigger, screen off included: GPS distance to the parked car, and the car's Bluetooth beacons when any are
- * chosen. Whichever comes first starts the car; the other then counts as having fired too.
+ * chosen. Whichever comes first starts the car, and the other stays silent until you've left. Leaving works the same
+ * way: whichever notices first (the beacon gone, or the distance) runs the walk-away action, once per stay.
  */
 public final class MonitorService extends Service {
     private int fireMetres, rearmMetres;
@@ -36,6 +37,19 @@ public final class MonitorService extends Service {
     private int unsureInRow;
     /** Readings faster than walking were seen and the trip hasn't been closed with a car check yet. */
     private boolean onTrip;
+    /**
+     * You've been with the car (an arrival fired, or you drove it) and the walk-away action hasn't run since: the first
+     * confirmed departure, by Bluetooth or distance, runs it and clears this. Saved, so a restart doesn't run it twice.
+     */
+    private boolean walkAwayPending;
+    /** An accurate, fresh phone reading taken while a beacon was at its strength: where you were with the car. */
+    private Location atCarFix;
+    /** When a beacon was last at its strength (wall clock), and when the last beacon departure check started (elapsed). */
+    private long lastStrongAt, beaconCheckAt;
+    /** GPS confirmed you walked away from the parked car, but left the walk-away to the beacon, which was still strong. */
+    private boolean gpsSawYouLeave;
+    /** When an arrival last fired (elapsed): a walk-away decided before it isn't sent, because you came back. */
+    private long lastArrivalAt=-1;
     private long lastDistanceAt;
     private final ConnectivityManager.NetworkCallback wifiCallback=new ConnectivityManager.NetworkCallback(ConnectivityManager.NetworkCallback.FLAG_INCLUDE_LOCATION_INFO) {
         @Override public void onCapabilitiesChanged(Network network,NetworkCapabilities caps) {
@@ -52,14 +66,10 @@ public final class MonitorService extends Service {
     private List<ScanFilter> filters;
     private long started, scanEveryMs;
     private final Handler handler=new Handler(Looper.getMainLooper());
-    /** Once a second: a beacon out of range long enough arms the Bluetooth trigger. It never runs the walk-away action,
-     *  because the beacon also leaves when someone else drives the car away. */
+    /** Once a second: has the beacon been out of range long enough, with GPS agreeing you're away from the car? */
     private final Runnable tick=new Runnable() {
         @Override public void run() {
-            if(beaconGate.tick(SystemClock.elapsedRealtime()-started)) {
-                AppRuntime.proximityEvent(MonitorService.this,"Armed by Bluetooth: the beacon was out of range");
-                showProximity(lastDistance,lastDistanceAt);
-            }
+            if(beaconGate.absent(SystemClock.elapsedRealtime()-started) && awayFromCar()) beaconGone();
             handler.postDelayed(this,1000);
         }
     };
@@ -125,6 +135,7 @@ public final class MonitorService extends Service {
         android.content.SharedPreferences prefs=AppRuntime.prefs(this);
         fireMetres=AppRuntime.fireMetres(this); rearmMetres=AppRuntime.rearmMetres(this);
         proximity=new ProximityGate(fireMetres,rearmMetres,prefs.getBoolean("gateArmed",false));
+        walkAwayPending=prefs.getBoolean("walkAwayPending",false);
         showProximity("No fix",System.currentTimeMillis());
         locations=getSystemService(LocationManager.class);
         LocationRequest request=new LocationRequest.Builder(AppRuntime.intervalSeconds(this)*1000L).setQuality(LocationRequest.QUALITY_HIGH_ACCURACY).build();
@@ -178,13 +189,13 @@ public final class MonitorService extends Service {
         String shown=withCar && !proximity.armed()?"With the car":Math.round(metres)+" m"+(rough?" ±"+Math.round(fix.getAccuracy()):"");
         showProximity(shown,System.currentTimeMillis()-age);
         String reading=Math.round(metres)+" m ±"+Math.round(fix.getAccuracy())+" m";
-        if(event==ProximityGate.Event.LEFT) checkCar(reading,60000,false);
+        if(event==ProximityGate.Event.LEFT) checkCar(reading,60000,false,false);
         // Leaving is only seen after a good reading beside the car. Without one (GPS is often rough there), the car could
         // be driven off unnoticed, so while you're in a vehicle the app also checks whether the car moves with you.
-        else if(moving && !late) checkCar(reading,ProximityGate.vehicleCheckGapMs(unsureInRow),false);
+        else if(moving && !late) checkCar(reading,ProximityGate.vehicleCheckGapMs(unsureInRow),false,false);
         // Two minutes without fast readings ends the trip: one car check follows the car to where it was parked, even
         // if checks during the drive failed (seen: BYD busy, 1008), and the next trip starts with checks every minute.
-        else if(onTrip && !late && SystemClock.elapsedRealtime()-lastFastAt>2*60_000 && checkCar(reading,0,true)) {
+        else if(onTrip && !late && SystemClock.elapsedRealtime()-lastFastAt>2*60_000 && checkCar(reading,0,true,false)) {
             onTrip=false; unsureInRow=0;
         }
         if(event==ProximityGate.Event.FIRE) verifyThenArrive(Math.round(metres));
@@ -228,13 +239,15 @@ public final class MonitorService extends Service {
         }
         AppRuntime.prefs(this).edit().putLong("lastAutoStartAt",System.currentTimeMillis()).putBoolean("gateArmed",false).commit();
         if(beaconGate!=null) beaconGate.disarm();
-        AppRuntime.proximityEvent(this,"Triggered at "+metres+" m");
-        arrival();
+        setWalkAwayPending(true);
+        lastArrivalAt=SystemClock.elapsedRealtime();
+        AppRuntime.proximityEvent(this,"Triggered by distance: "+metres+" m");
+        arrival("Distance: "+metres+" m from the car");
     }
     /** Every 15 minutes, a follow-only check, so the car is followed while someone else drives it. */
     private final Runnable periodicCheck=new Runnable() {
         @Override public void run() {
-            if(!AppRuntime.abroad(MonitorService.this)) checkCar("periodic check",0,true);
+            if(!AppRuntime.abroad(MonitorService.this)) checkCar("periodic check",0,true,false);
             handler.postDelayed(this,15*60_000L);
         }
     };
@@ -267,18 +280,19 @@ public final class MonitorService extends Service {
     private boolean checking;
     private long lastCheck;
     /**
-     * You got away from the car's saved spot, by walking or by driving it, or you're in a vehicle. BYD is asked where the
-     * car is, at most once per gapMs: once a minute after leaving or while in a vehicle, less often while the car stays put.
+     * You got away from the car's saved spot, by walking or by driving it, you're in a vehicle, or the beacon went
+     * (byBeacon). BYD is asked where the car is, at most once per gapMs: once a minute after leaving or while in a
+     * vehicle, less often while the car stays put.
      */
-    private boolean checkCar(String reading,long gapMs,boolean followOnly) {
+    private boolean checkCar(String reading,long gapMs,boolean followOnly,boolean byBeacon) {
         if(checking || SystemClock.elapsedRealtime()-lastCheck<gapMs) return false;
         checking=true;
         boolean travelling=onTrip || SystemClock.elapsedRealtime()-lastFastAt<2*60_000;
         AppRuntime.IO.execute(()-> {
             try {
                 double[] car=AppRuntime.api(this).location(AppRuntime.prefs(this).getString("vin",""));
-                logCarPosition(followOnly?"follow-only check":"car check",car);
-                handler.post(()->carChecked(car,reading,followOnly,travelling));
+                logCarPosition(followOnly?"follow-only check":byBeacon?"beacon out of range":"car check",car);
+                handler.post(()->carChecked(car,reading,followOnly,travelling,byBeacon));
             } catch(Exception error) {
                 AppRuntime.clearSession();
                 handler.post(()-> {
@@ -294,10 +308,11 @@ public final class MonitorService extends Service {
      * Moved more than the re-arm distance: you drove it, so its new spot is saved and the trigger waits for you to leave it.
      * Still there: you walked away, so the trigger arms and, if it had fired, the walk-away action runs.
      */
-    private void carChecked(double[] car,String reading,boolean followOnly,boolean travelling) {
+    private void carChecked(double[] car,String reading,boolean followOnly,boolean travelling,boolean byBeacon) {
         checking=false; lastCheck=SystemClock.elapsedRealtime();
         if(stopped || AppRuntime.abroad(this)) return;
         long moved=Math.round(ProximityGate.metres(car[0],car[1],carLatitude,carLongitude));
+        if(byBeacon) { if(beaconGate!=null) beaconLeft(car,moved); return; }
         Location you=lastFix;
         double apart=you==null?Double.MAX_VALUE:ProximityGate.metres(car[0],car[1],you.getLatitude(),you.getLongitude());
         ProximityGate.CarCheck result=ProximityGate.carCheck(moved,rearmMetres,apart,SystemClock.elapsedRealtime()-lastFastAt<15000,
@@ -314,12 +329,15 @@ public final class MonitorService extends Service {
                 if(!followOnly) unsureInRow++; // you're in another vehicle: space the checks out
                 carLatitude=car[0]; carLongitude=car[1]; AppRuntime.saveCar(this,carLatitude,carLongitude);
                 proximity.spotChanged(); withCar=false;
+                setWalkAwayPending(false); // someone else has the car: your stay with it is over, so nothing runs for it
                 AppRuntime.proximityEvent(this,"Car moved "+moved+" m without you, "+Math.round(apart)+" m from you: position updated");
                 return;
             case MOVED_WITH_YOU:
                 unsureInRow=0;
                 carLatitude=car[0]; carLongitude=car[1]; AppRuntime.saveCar(this,carLatitude,carLongitude);
                 proximity.carChecked(true); withCar=true;
+                if(beaconGate!=null) beaconGate.disarm(); // you're in the car: a dip in its signal mustn't start it mid-trip
+                setWalkAwayPending(true);
                 AppRuntime.prefs(this).edit().putBoolean("gateArmed",false).commit();
                 AppRuntime.proximityEvent(this,"Car moved "+moved+" m with you: following it");
                 showProximity("With the car",System.currentTimeMillis());
@@ -327,13 +345,112 @@ public final class MonitorService extends Service {
             default: // WALKED_AWAY or AWAY: the car is at its spot and you're away from it
                 unsureInRow=0;
                 boolean wasArmed=proximity.armed();
+                // The beacon arms only when it is itself out of range: armed now, a beacon still strong 25 m away
+                // would start the car again right after the walk-away action.
                 proximity.carChecked(false); withCar=false;
                 AppRuntime.prefs(this).edit().putBoolean("gateArmed",true).commit();
-                if(!wasArmed) AppRuntime.proximityEvent(this,"Armed by GPS: "+reading);
+                if(!wasArmed) AppRuntime.proximityEvent(this,"Armed by distance: "+reading);
                 showProximity(lastDistance,lastDistanceAt);
                 // Only if you were with the car: it never locks or turns off a car someone else is using (seen 17:18).
-                if(result==ProximityGate.CarCheck.WALKED_AWAY && !wasArmed) leave(AppRuntime.leaveAction(this));
+                if(result!=ProximityGate.CarCheck.WALKED_AWAY) return;
+                // A beacon at full strength in the last 15 s says you're at the car, whatever GPS says: Bluetooth decides then.
+                if(beaconGate!=null && beaconGate.strongSince(SystemClock.elapsedRealtime()-started-15_000)) {
+                    gpsSawYouLeave=true;
+                    AppRuntime.log(this,"car check: GPS says you left, but the beacon is at full strength: leaving the walk-away to Bluetooth");
+                }
+                else walkAway("Walk away by distance: "+reading);
         }
+    }
+    /**
+     * BYD's answer after the beacon went. Its position becomes the car's spot (one saved during the drive may be out of
+     * date) and both triggers arm. In a vehicle you didn't walk away, so nothing runs. The walk-away action may run only
+     * if BYD's position, reported after you parted, puts the car where you were with it: if it has moved since, someone
+     * else is driving it (your wife after dropping you off). Without an accurate reading from where you parted, it's
+     * left to the distance.
+     */
+    private void beaconLeft(double[] car,long moved) {
+        if(beaconGate.strongSince(beaconCheckAt-started)) { AppRuntime.log(this,"beacon back at full strength: you're at the car"); return; }
+        beaconGate.leftCar();
+        if(SystemClock.elapsedRealtime()-lastFastAt<60_000) {
+            AppRuntime.log(this,"beacon out of range while you're in a vehicle: not walking away");
+            return;
+        }
+        carLatitude=car[0]; carLongitude=car[1]; AppRuntime.saveCar(this,carLatitude,carLongitude);
+        Location were=atCarFix;
+        String trigger="Walk away by Bluetooth: beacon out of range";
+        if(were==null || were.getTime()<lastStrongAt-120_000 || car[2]*1000<lastStrongAt) {
+            // GPS already confirmed the car at its spot with you on foot, and it hasn't moved since: that decides.
+            if(gpsSawYouLeave && moved<=rearmMetres) { gpsSawYouLeave=false; walkAway(trigger); return; }
+            // The GPS trigger is left as it is, so the distance can still see you leave and decide.
+            AppRuntime.log(this,"walk-away by Bluetooth: no accurate reading from where you left the car, or BYD's position is older; left to the distance");
+            return;
+        }
+        gpsSawYouLeave=false;
+        boolean wasArmed=proximity.armed();
+        proximity.carChecked(false); withCar=false; unsureInRow=0;
+        AppRuntime.prefs(this).edit().putBoolean("gateArmed",true).commit();
+        if(!wasArmed) AppRuntime.proximityEvent(this,"Armed by Bluetooth: beacon out of range, car "+moved+" m from its saved spot");
+        showProximity(lastDistance,lastDistanceAt);
+        double drift=ProximityGate.metres(car[0],car[1],were.getLatitude(),were.getLongitude());
+        if(!ProximityGate.leftWhereYouWere(drift,were.getAccuracy())) {
+            if(walkAwayPending) {
+                setWalkAwayPending(false);
+                AppRuntime.record(this,trigger,List.of(AppRuntime.leaveAction(this)),History.SKIPPED,
+                    "Not sent: the car moved "+Math.round(drift)+" m since you were at it, so someone else may be driving it.");
+            }
+            return;
+        }
+        walkAway(trigger);
+    }
+    private void setWalkAwayPending(boolean pending) {
+        walkAwayPending=pending;
+        AppRuntime.prefs(this).edit().putBoolean("walkAwayPending",pending).commit();
+    }
+    /**
+     * Runs the walk-away action at most once per stay: the first confirmed departure takes it, so the beacon and the
+     * distance can't both run it.
+     */
+    private void walkAway(String trigger) {
+        String action=AppRuntime.leaveAction(this);
+        if(!walkAwayPending || action.isEmpty()) return;
+        setWalkAwayPending(false);
+        sendWalkAway(action,trigger,SystemClock.elapsedRealtime(),1);
+    }
+    /**
+     * Reads BYD's live data first: unless the car reports standing still, someone may be driving it, so nothing is sent.
+     * A failed read, or another action still running, is tried again in 30 seconds, 3 times in all.
+     */
+    private void sendWalkAway(String action,String trigger,long decidedAt,int attempt) {
+        if(stopped) return;
+        if(AppRuntime.BUSY.get()) { retryWalkAway(action,trigger,decidedAt,attempt,"another action was running"); return; }
+        AppRuntime.IO.execute(()-> {
+            try {
+                org.json.JSONObject live=AppRuntime.api(this).realtime(AppRuntime.prefs(this).getString("vin",""));
+                AppRuntime.log(this,"walk-away: car live data: powerGear "+live.optInt("powerGear",-1)+", speed "+live.optDouble("speed",-1));
+                handler.post(()->walkAwayChecked(action,trigger,decidedAt,live));
+            } catch(Exception error) {
+                AppRuntime.clearSession();
+                handler.post(()->retryWalkAway(action,trigger,decidedAt,attempt,"couldn't read whether the car is moving: "+AppRuntime.safeError(error)));
+            }
+        });
+    }
+    private void retryWalkAway(String action,String trigger,long decidedAt,int attempt,String reason) {
+        if(attempt>=3) { AppRuntime.record(this,trigger,List.of(action),History.FAIL,"Not sent: "+reason); return; }
+        AppRuntime.log(this,"walk-away: "+reason+"; trying again in 30 seconds");
+        handler.postDelayed(()->sendWalkAway(action,trigger,decidedAt,attempt+1),30_000);
+    }
+    /** If an arrival fired since the walk-away was decided, you came back, so it's dropped. */
+    private void walkAwayChecked(String action,String trigger,long decidedAt,org.json.JSONObject live) {
+        if(stopped) return;
+        if(lastArrivalAt>decidedAt) {
+            AppRuntime.record(this,trigger,List.of(action),History.SKIPPED,"Not sent: you came back and the car was started again.");
+            return;
+        }
+        if(!BydApi.standingStill(live)) {
+            AppRuntime.record(this,trigger,List.of(action),History.SKIPPED,"Not sent: the car is moving or didn't report its speed, so someone may be driving it.");
+            return;
+        }
+        leave(action,trigger);
     }
     private boolean onTrustedWifi() { return currentWifi!=null && AppRuntime.trustedWifi(this).contains(currentWifi); }
     /**
@@ -397,18 +514,54 @@ public final class MonitorService extends Service {
         AppRuntime.log(this,"Bluetooth: "+AutoStartSettings.beaconScanLabel(seconds)+"; "+String.join(", ",strengths));
     }
     /**
+     * The beacon has been out of range for the away time and GPS agrees you're away. This arms the Bluetooth trigger.
+     * If you had been at the car, BYD is asked where the car is (see beaconLeft), at most once a minute: a check that
+     * failed, or couldn't start while another ran, is tried again.
+     */
+    private void beaconGone() {
+        if(!beaconGate.armed()) {
+            beaconGate.arm();
+            AppRuntime.proximityEvent(this,"Armed by Bluetooth: the beacon is out of range");
+            showProximity(lastDistance,lastDistanceAt);
+        }
+        if(beaconGate.atCar() && checkCar("beacon out of range",60_000,false,true)) beaconCheckAt=SystemClock.elapsedRealtime();
+    }
+    /**
+     * GPS agrees you're away from the car: a reading from the last minute, its whole accuracy margin beyond the start
+     * distance, and not in a vehicle for a minute (while driving, the car's saved spot lags behind). So a dip in the
+     * beacon's signal while you sit in the car, park or drive can't re-arm it. Without such a reading it waits.
+     */
+    private boolean awayFromCar() {
+        Location you=lastFix;
+        if(you==null || SystemClock.elapsedRealtime()-lastFastAt<60_000) return false;
+        long age=(SystemClock.elapsedRealtimeNanos()-you.getElapsedRealtimeNanos())/1_000_000;
+        double metres=ProximityGate.metres(you.getLatitude(),you.getLongitude(),carLatitude,carLongitude);
+        return age<=60_000 && metres-you.getAccuracy()>fireMetres;
+    }
+    /**
      * A sighting of a chosen beacon, as its margin over the calibrated strength. The beacon is in the car, so a strong
      * signal proves the car is here: unlike the start distance, BYD isn't asked first.
      */
     private void beaconSeen(Beacons.Beacon beacon,int rssi) {
         if(beaconGate==null) return;
+        if(rssi>=beacon.threshold) atCar();
         boolean mayStart=cooldownPassed() && !onTrustedWifi() && !verifying && SystemClock.elapsedRealtime()-lastFastAt>=15000;
         if(!beaconGate.observe(SystemClock.elapsedRealtime()-started,rssi-beacon.threshold,mayStart)) return;
         proximity.startedByBeacon();
         AppRuntime.prefs(this).edit().putLong("lastAutoStartAt",System.currentTimeMillis()).putBoolean("gateArmed",false).commit();
+        setWalkAwayPending(true);
+        lastArrivalAt=SystemClock.elapsedRealtime();
         AppRuntime.proximityEvent(this,"Triggered by Bluetooth: "+beacon.label+" at "+rssi+" dBm");
         showProximity(lastDistance,lastDistanceAt);
-        arrival();
+        arrival("Bluetooth: "+beacon.label+" at "+rssi+" dBm");
+    }
+    /** A beacon at its strength: you're at the car. Keeps the phone's reading if it's fresh and accurate enough to say where. */
+    private void atCar() {
+        lastStrongAt=System.currentTimeMillis();
+        Location you=lastFix;
+        if(you==null) return;
+        long age=(SystemClock.elapsedRealtimeNanos()-you.getElapsedRealtimeNanos())/1_000_000;
+        if(age<=30_000 && you.getAccuracy()<=rearmMetres) atCarFix=you;
     }
     /** Permission was checked in startBeacons; Android ends the app if it is revoked. */
     @android.annotation.SuppressLint("MissingPermission")
@@ -440,11 +593,13 @@ public final class MonitorService extends Service {
     }
     private void stopWithStatus(String message) { AppRuntime.status(this,message); stopSelf(); }
     /** A failure here doesn't stop monitoring: the trigger is armed, so it can't repeat before your next arrival. */
-    private void leave(String action) {
-        if(action.isEmpty()) return;
-        AppRuntime.execute(this,List.of(action),false,true,()->{});
+    private void leave(String action,String trigger) {
+        if(stopped) return;
+        AppRuntime.execute(this,List.of(action),trigger,false,true,()->{});
     }
-    private void arrival() { AppRuntime.execute(this,Actions.arrival(AppRuntime.arrivalAction(this),AppRuntime.customs(this)),true,true,()->{}); }
+    private void arrival(String trigger) {
+        AppRuntime.execute(this,Actions.arrival(AppRuntime.arrivalAction(this),AppRuntime.customs(this)),trigger,true,true,()->{});
+    }
     @Override public void onDestroy() {
         stopped=true;
         handler.removeCallbacksAndMessages(null);

@@ -25,7 +25,7 @@ You need:
 | **Close & lock** | Turns the car off (A/C off), closes the windows and the tailgate, then locks. Every step is sent even if one fails, so a failure can't leave the car unlocked; the result lists what failed. |
 | **Open trunk** / **Close trunk** | Opens or closes the trunk. |
 | **A/C on** | Starts the A/C at one fixed temperature that you choose. |
-| **Driver seat heat** / **Passenger seat heat** | Turns that seat's heating on. |
+| **Driver seat heat** / **Passenger seat heat** | Turns that seat's heating on, at high. |
 | **Close windows** | Closes the windows. |
 | **Flash lights** | Flashes the lights. |
 | **Find car** | Flashes the lights and sounds the horn. |
@@ -83,7 +83,12 @@ Long-press your home screen → Widgets → **BYD Arrival**, or use Settings →
 
 ### Home screen
 
-Shows the latest status, the auto-start state, a large **Start car** button and a tile for every action. Commands are never retried automatically, with two exceptions where BYD refuses a request without acting on it. Signing in with the same account elsewhere, for example in the official app, ends this app's session, so the app signs in again and sends the request once more. And when the car is still busy with the previous command (code 6024, for example windows still closing during Close & lock), the app waits 5 seconds and sends it again, up to 3 times. Automatic actions (auto-start and the walk-away action) are tried once more after 20 seconds when the network failed before any command was sent, for example while checking the PIN; the car can't have acted then. If a result is unknown, check the car before trying again.
+Shows the latest status, the auto-start state, a large **Start car** button, a tile for every action and **Recent actions**. Commands are never retried automatically, with two exceptions where BYD refuses a request without acting on it. Signing in with the same account elsewhere, for example in the official app, ends this app's session, so the app signs in again and sends the request once more. And when the car is still busy with the previous command (code 6024, for example windows still closing during Close & lock), the app waits 5 seconds and sends it again, up to 3 times. Automatic actions (auto-start and the walk-away action) are tried once more after 20 seconds when the network failed before any command was sent, for example while checking the PIN; the car can't have acted then. If a result is unknown, check the car before trying again.
+
+**Recent actions** lists the last 40 actions, newest first. Each shows when it ran, what triggered it, what ran and how it ended:
+
+- **Triggers:** `App`, `Widget`, `Bluetooth: CP27-60BC at -52 dBm`, `Distance: 12 m from the car`, `Walk away by Bluetooth: beacon out of range` or `Walk away by distance: 230 m ±8 m`.
+- **Results:** a green ✓ with BYD's confirmation and what Start car chose, a red ✗ with the error, or a grey – for an automatic action the app deliberately didn't send, with the reason (for example `Not sent: the car moved 640 m since you were at it, so someone else may be driving it`).
 
 ### Start car
 
@@ -94,7 +99,7 @@ Start car reads the cabin temperature, picks the matching range and starts the A
 
 | Range | Default | A/C | Fan | Seat heat |
 |---|---|---|---|---|
-| Freezing | below 17 °C | 26 °C | 3 | driver |
+| Freezing | below 17 °C | 26 °C | 3 | driver high |
 | Cold | 17 to 20 °C | 26 °C | 3 | off |
 | Mild | 20 to 24 °C | 20 °C | 3 | off |
 | Warm | 24 to 28 °C | 18 °C | 5 | off |
@@ -104,7 +109,7 @@ A range includes its start and stops just before the next one starts: Mild cover
 
 - **Where each range starts:** set with **−** and **+**. The range below then ends there automatically, so there's one border to set per range and they can't overlap or leave a gap. Moving a border past the next one pushes that one along, keeping every range at least 1 °C wide.
 - **A/C and fan:** also set with **−** and **+**, within what the car accepts: A/C 17–33 °C on the Atto 3, fan 1–7. Values from older versions below 17 °C become 17 °C.
-- **Seat heat:** driver and passenger can be switched separately for each range. Seat heat is turned on at high.
+- **Seat heat:** **Off**, **Low** or **High**, set separately for the driver and the passenger in each range, also with **−** and **+**. Off leaves that seat as it is. Settings from older versions, where seat heat was on or off, become High (what was sent) or Off.
 - **Engine-on time:** 10 to 30 minutes in steps of 5, default 30. It applies to **Start car** and **A/C on**.
 - **A/C on button:** its own temperature, also 17–33 °C, with the fan on automatic.
 
@@ -140,7 +145,12 @@ How it behaves:
 - **It must see you leave first.** It starts disarmed, so turning it on beside the car does nothing.
 - **Inaccurate readings can't fire it.** Readings less accurate than the re-arm distance are ignored.
 - **A failed command stops monitoring,** with a message explaining why. A failed walk-away action doesn't, because it can't repeat before your next arrival.
-- **The walk-away action runs once you're past the re-arm distance after an auto-start.** With GPS, it runs only when BYD reports the car still at its spot, so driving off doesn't run it; it runs once you walk away from where you parked. Arming by a trusted Wi-Fi never runs it. A beacon going out of range never runs it, because the beacon also leaves when someone else drives the car away.
+- **One start and one walk-away per stay.** Whichever trigger notices your arrival first (a beacon or the distance) starts the car, and the other stays silent until you've left. Leaving works the same way: whichever notices first that you walked away runs the walk-away action, once. That's the beacon going out of range (usually within about a minute), or getting past the re-arm distance.
+- **The walk-away action runs only when you walked away from the parked car.** You must have been with the car since it last ran (an auto-start, or you drove it); if someone else then drives it off, that stay is over and it doesn't run.
+  - **By distance:** BYD must report the car still at its spot and you on foot. If the beacon was at full strength in the last 15 seconds, you're still at the car whatever GPS says, so the beacon decides instead.
+  - **By beacon:** GPS must agree you're away, you mustn't have been in a vehicle for a minute, and BYD's position (reported after you parted) must put the car within 50 m of where your phone was when the beacon was last at full strength. If your wife drops you off and drives on, the car has left that spot by then, so nothing is sent.
+  - **Last check:** BYD's live data is read just before sending, and nothing is sent unless the car reports standing still. A car that's switched on but standing (left on, or running remote A/C) is turned off and locked, which is what walking away is for. If you come back and the car starts again meanwhile, it's dropped. A failed read, or another action still running, is tried again every 30 seconds, 3 times.
+  - Arming by a trusted Wi-Fi never runs it, though walking away afterwards still can.
 - **It restarts by itself** after an app update, after the phone restarts, and if Android stops the app. The event line then says so, for example `Restarted after the phone restarted`.
 - **It keeps trying when it can't reach the car.** If BYD has no position for the car or the network isn't up yet (common right after a restart), it tries again after 1 minute, then less often, up to every 15 minutes. Only **Stop**, a failed car command, signing in again or forgetting credentials turn it off.
 - **It shows how good the reading is.** The time next to the distance is when the reading was taken, so a stale one looks stale. A reading too rough to use shows its margin, for example `1991 m ±1500`; it can't start or arm anything. Readings more than 30 seconds late are ignored too. The app asks both GPS and Google's combined location, because the combined one sometimes falls back to a rough network position while GPS works.
@@ -191,7 +201,8 @@ Under Settings → **Bluetooth beacons in the car**:
 How it behaves:
 
 - An iBeacon is recognised by its UUID, major and minor, because its address may change; any other beacon by its address. Use a beacon that broadcasts all the time; tracker tags change their address, and a car's own Bluetooth usually can't be found by this scan.
-- It fires after three strong readings in a row. It's ready again after the beacon was out of range (more than 10 dB under its strength, or not heard) for 60 seconds, or for two listening rounds when they're more than 30 seconds apart. A beacon going out of range never runs the walk-away action.
+- It fires after three strong readings in a row. It's ready again after the beacon was out of range (more than 10 dB under its strength, or not heard) for 60 seconds, or for two listening rounds when they're more than 30 seconds apart, and GPS agrees you're away from the car (a reading from the last minute, clear of the start distance, and not in a vehicle for a minute). Arming by distance doesn't arm the beacon: it arms only when it's out of range itself, so a beacon still strong 25 m away can't start the car again right after you walked away. A weak signal while you sit in the car or drive can't start it again either.
+- When the beacon goes out of range after you were at the car, BYD is asked where the car is. That position becomes the car's spot, and the walk-away action may run (see the auto-start rules above). If you come back to the car while BYD is being asked, nothing is sent.
 - The log notes how often it listens and each beacon's strength whenever monitoring starts.
 - Signal strength is only a rough guide to distance, and Bluetooth signals can be spoofed.
 ## Updates
