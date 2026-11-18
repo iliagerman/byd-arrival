@@ -378,7 +378,7 @@ public final class MonitorService extends Service {
         if(adapter==null || !adapter.isEnabled()) { AppRuntime.note(this,"Beacons ignored: Bluetooth is off."); return; }
         scanner=adapter.getBluetoothLeScanner();
         started=SystemClock.elapsedRealtime();
-        int seconds=AppRuntime.intervalSeconds(this);
+        int seconds=AppRuntime.beaconScanSeconds(this);
         beaconGate=new ArrivalGate(AutoStartSettings.beaconAbsentMillis(seconds));
         // Filters are required: Android stops delivering unfiltered scan results while the screen is off.
         filters=new ArrayList<>();
@@ -390,8 +390,11 @@ public final class MonitorService extends Service {
                 :new ScanFilter.Builder().setDeviceAddress(Beacons.address(beacon.id)).build());
         }
         scanEveryMs=seconds*1000L;
-        if(seconds<AutoStartSettings.SCAN_ROUNDS_FROM_SECONDS) startScan(); else handler.post(scanRound);
+        if(seconds==0) startScan(); else handler.post(scanRound);
         handler.post(tick);
+        List<String> strengths=new ArrayList<>();
+        for(Beacons.Beacon beacon:beacons) strengths.add(beacon.label+" at "+beacon.threshold+" dBm");
+        AppRuntime.log(this,"Bluetooth: "+AutoStartSettings.beaconScanLabel(seconds)+"; "+String.join(", ",strengths));
     }
     /**
      * A sighting of a chosen beacon, as its margin over the calibrated strength. The beacon is in the car, so a strong
@@ -419,8 +422,8 @@ public final class MonitorService extends Service {
     }
     private final Runnable stopRound=this::stopScan;
     /**
-     * Scans for 5 seconds every interval, enough for several sightings of the beacon. Rounds start at least
-     * 10 seconds apart, because Android blocks apps that start a scan more than 5 times in 30 seconds.
+     * Scans for 5 seconds every chosen interval, enough for several sightings of the beacon. The choices keep rounds
+     * at least 10 seconds apart, because Android blocks apps that start a scan more than 5 times in 30 seconds.
      */
     private final Runnable scanRound=new Runnable() {
         @Override public void run() {

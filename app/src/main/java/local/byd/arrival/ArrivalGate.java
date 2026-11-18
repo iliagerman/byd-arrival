@@ -3,9 +3,11 @@ package local.byd.arrival;
 /**
  * Bluetooth arrival trigger for a beacon in the car. Each sighting is given as its margin over the beacon's calibrated
  * strength in dB (0: exactly at it). It fires on three strong sightings in a row, at most 10 s apart, but only once
- * armed: after the beacon was out of range (more than 10 dB under its strength, or unheard) for a while.
+ * armed: after the beacon was out of range (more than AWAY_DB under its strength, or unheard) for a while.
  */
 public final class ArrivalGate {
+    /** This many dB under its strength, the beacon counts as out of range. */
+    public static final int AWAY_DB = 10;
     private final long absentMillis;
     private long lastNearby, previousSample = -1;
     private int samples;
@@ -24,7 +26,7 @@ public final class ArrivalGate {
     public void disarm() { armed = false; samples = 0; }
     /** True when the car should start. mayStart is false during the cooldown, on trusted Wi-Fi or while driving: it stays armed. */
     public boolean observe(long now, int marginDb, boolean mayStart) {
-        if (marginDb >= -10) lastNearby = now;
+        if (marginDb >= -AWAY_DB) lastNearby = now;
         if (previousSample < 0 || now - previousSample > 10000) samples = 0;
         previousSample = now;
         if (!armed || marginDb < 0) { samples = 0; return false; }

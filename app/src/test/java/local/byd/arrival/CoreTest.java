@@ -69,13 +69,18 @@ public class CoreTest {
         check(Beacons.iBeaconId(new byte[]{0x10, 0x05, 1, 2, 3}) == null && Beacons.iBeaconId(null) == null, "other Apple data is no iBeacon");
         check(Arrays.equals(Beacons.iBeaconFilter(ibeacon), Arrays.copyOf(apple, 22)), "the scan filter matches exactly that iBeacon's advertisement");
         check(Beacons.iBeaconFilter("mac:48:87:2D:9E:60:BC") == null && Beacons.address("mac:48:87:2D:9E:60:BC").equals("48:87:2D:9E:60:BC"), "an address beacon is filtered by address");
-        check(Beacons.calibrate(List.of(-60, -62, -58, -61, -59)) == -63, "calibration: 3 dB under the middle reading, so that spot triggers reliably");
-        check(Beacons.calibrate(List.of(-20, -21, -22)) == -30 && Beacons.calibrate(List.of(-99, -100, -101)) == -100, "calibration stays within -100 to -30 dBm");
+        Beacons.Calibration calibration = Beacons.calibrate(List.of(-60, -62, -58, -61, -59));
+        check(calibration.threshold == -63, "calibration: 3 dB under the middle reading, so that spot triggers reliably");
+        check(calibration.middle == -60 && calibration.weakest == -62 && calibration.strongest == -58 && calibration.readings == 5, "calibration shows what it heard");
+        check(Beacons.calibrate(List.of(-20, -21, -22)).threshold == Beacons.STRONGEST && Beacons.calibrate(List.of(-99, -100, -101)).threshold == Beacons.WEAKEST, "calibration stays within -100 to -30 dBm");
         try { Beacons.calibrate(List.of(-60, -61)); throw new AssertionError("must need 3 readings"); }
         catch (IllegalArgumentException expected) { check(true, "calibration needs at least 3 readings"); }
-        List<Beacons.Beacon> chosen = List.of(new Beacons.Beacon(ibeacon, "iBeacon", -63), new Beacons.Beacon("mac:48:87:2D:9E:60:BC", "CP27-60BC", -66));
+        List<Beacons.Beacon> chosen = List.of(new Beacons.Beacon(ibeacon, "iBeacon", -63, "Calibrated 18 Nov 14:02"), new Beacons.Beacon("mac:48:87:2D:9E:60:BC", "CP27-60BC", -66, ""));
         List<Beacons.Beacon> saved = Beacons.parse(Beacons.toJson(chosen));
         check(saved.size() == 2 && saved.get(1).label.equals("CP27-60BC") && saved.get(0).threshold == -63, "chosen beacons and their strengths survive saving");
+        check(saved.get(0).note.equals("Calibrated 18 Nov 14:02") && saved.get(1).note.isEmpty(), "how each strength was set survives saving");
+        check(saved.get(0).withThreshold(-58, "Set by hand").threshold == -58 && saved.get(0).withThreshold(-58, "Set by hand").note.equals("Set by hand"), "a new strength carries its own note");
+        check(Beacons.parse("[{\"id\":\"mac:48:87:2D:9E:60:BC\",\"label\":\"CP27-60BC\",\"threshold\":-66}]").get(0).note.isEmpty(), "beacons saved before notes existed still load");
         List<String> calls = new ArrayList<>();
         Routine.run(List.of("OPENDOOR", "OPENAIR"), calls::add);
         check(calls.equals(List.of("OPENDOOR", "OPENAIR")), "runs commands in given order");
@@ -251,8 +256,13 @@ public class CoreTest {
         check(AutoStartSettings.intervalSeconds("0") == 1, "the check interval is at least 1 s");
         check(AutoStartSettings.intervalSeconds("300") == 60, "the check interval is at most 60 s");
         check(AutoStartSettings.intervalSeconds("often") == 5, "an unreadable check interval uses the default");
-        check(AutoStartSettings.beaconAbsentMillis(5) == 60000, "continuous scanning: out of range for 60 s means you left");
+        check(AutoStartSettings.beaconAbsentMillis(0) == 60000, "nonstop scanning: out of range for 60 s means you left");
         check(AutoStartSettings.beaconAbsentMillis(60) == 120000, "scanning every 60 s: out of range for two rounds means you left");
+        check(AutoStartSettings.BEACON_SCAN_SECONDS[0] == 0 && AutoStartSettings.beaconScanLabel(0).startsWith("Nonstop"), "the first beacon choice is nonstop, the default");
+        boolean roundsApart = true;
+        for (int seconds : AutoStartSettings.BEACON_SCAN_SECONDS) roundsApart &= seconds == 0 || seconds >= 10;
+        check(roundsApart, "beacon scan rounds start at least 10 s apart, under Android's limit of 5 scans in 30 s");
+        check(AutoStartSettings.beaconScanLabel(30).equals("Every 30 s (listens for 5 s)"), "a beacon scan choice says how often and how long it listens");
         check(UpdateCheck.buildOf("v42") == 42, "release tag holds the build number");
         check(UpdateCheck.newerBuild("v42", 41) == 42, "a higher build on GitHub is an update");
         check(UpdateCheck.newerBuild("v42", 42) == 0, "the same build is not an update");

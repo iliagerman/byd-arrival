@@ -8,10 +8,12 @@ import android.view.View;
 import android.widget.*;
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.function.IntConsumer;
 
 /**
- * Settings for the car's Bluetooth beacons: "Your beacons" (trigger strength, Calibrate, Remove) kept apart from what
- * a scan finds nearby. Beacons are listed first and strongest first, so the one in your hand is at the top.
+ * Settings for the car's Bluetooth beacons: "Your beacons" (trigger strength and how it was set, Adjust, Remove) kept
+ * apart from what a scan finds nearby, and how often monitoring listens for them. Nearby lists beacons first and
+ * strongest first, so the one in your hand is at the top.
  */
 final class BeaconSettings {
     /** Something a scan heard. kind: iBeacon, Eddystone beacon or other device. */
@@ -43,7 +45,34 @@ final class BeaconSettings {
     BeaconSettings(Activity activity,Runnable changed) {
         this.activity=activity; this.changed=changed;
         activity.findViewById(R.id.scan).setOnClickListener(v->scan());
+        bindScanInterval();
         showChosen(); showNearby();
+    }
+    /** How often monitoring listens for the beacons. Applies straight away, like changes to the list. */
+    private void bindScanInterval() {
+        Spinner spinner=activity.findViewById(R.id.beacon_scan);
+        List<String> labels=new ArrayList<>();
+        for(int seconds:AutoStartSettings.BEACON_SCAN_SECONDS) labels.add(AutoStartSettings.beaconScanLabel(seconds));
+        spinner.setAdapter(new ArrayAdapter<>(activity,android.R.layout.simple_spinner_dropdown_item,labels));
+        spinner.setSelection(Arrays.binarySearch(AutoStartSettings.BEACON_SCAN_SECONDS,AppRuntime.beaconScanSeconds(activity)));
+        spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> parent,View view,int position,long rowId) {
+                int seconds=AutoStartSettings.BEACON_SCAN_SECONDS[position];
+                if(seconds==AppRuntime.beaconScanSeconds(activity)) return;
+                AppRuntime.prefs(activity).edit().putInt("beaconScanSeconds",seconds).apply();
+                changed.run();
+            }
+            @Override public void onNothingSelected(AdapterView<?> parent) {}
+        });
+    }
+    /** Scans for one beacon, giving each of its signals to onSignal, until stop(). False when the scan can't start. */
+    boolean listen(String id,IntConsumer onSignal) {
+        stop();
+        return startScan(result-> { if(idOf(result).equals(id)) onSignal.accept(result.getRssi()); });
+    }
+    private static String idOf(ScanResult result) {
+        ScanRecord record=result.getScanRecord();
+        return Beacons.idFor(result.getDevice().getAddress(),record==null?null:record.getManufacturerSpecificData(0x004C));
     }
     void stop() {
         handler.removeCallbacksAndMessages(null);
@@ -60,7 +89,7 @@ final class BeaconSettings {
     }
     private void heard(ScanResult result) {
         ScanRecord record=result.getScanRecord();
-        String id=Beacons.idFor(result.getDevice().getAddress(),record==null?null:record.getManufacturerSpecificData(0x004C));
+        String id=idOf(result);
         boolean eddystone=false;
         if(record!=null && record.getServiceData()!=null)
             for(ParcelUuid uuid:record.getServiceData().keySet()) eddystone|=uuid.toString().startsWith("0000feaa");
@@ -77,8 +106,10 @@ final class BeaconSettings {
         activity.findViewById(R.id.beacon_none).setVisibility(beacons.isEmpty()?View.VISIBLE:View.GONE);
         for(Beacons.Beacon beacon:beacons) {
             Integer now=live.get(beacon.id);
+            String how=beacon.note.isEmpty()?activity.getString(R.string.strength_default):beacon.note;
             View row=row(list,beacon.label,Beacons.describe(beacon.id)+"\nStarts the car at "+beacon.threshold+" dBm or stronger"
-                +(now==null?"":" · now "+now+" dBm"),activity.getString(R.string.calibrate),()->calibrate(beacon));
+                +(now==null?"":" · now "+now+" dBm")+"\n"+how,activity.getString(R.string.adjust_strength),
+                ()->new BeaconStrength(activity,this,beacon,()-> { showChosen(); changed.run(); }));
             View remove=row.findViewById(R.id.row_remove);
             remove.setVisibility(View.VISIBLE);
             remove.setContentDescription(activity.getString(R.string.wifi_remove,beacon.label));
@@ -114,56 +145,16 @@ final class BeaconSettings {
     /** Added with a typical strength; calibrating at the car sets the real one. */
     private void add(Nearby found) {
         List<Beacons.Beacon> beacons=new ArrayList<>(AppRuntime.beacons(activity));
-        beacons.add(new Beacons.Beacon(found.id,found.label(),Beacons.DEFAULT_THRESHOLD));
+        beacons.add(new Beacons.Beacon(found.id,found.label(),Beacons.DEFAULT_THRESHOLD,""));
         AppRuntime.setBeacons(activity,beacons);
         showChosen(); showNearby(); changed.run();
-        toast("Added "+found.label()+". Put it in the car, then tap Calibrate beside the car.");
+        toast("Added "+found.label()+". Put it in the car, then tap Adjust beside the car to calibrate it.");
     }
     private void remove(Beacons.Beacon beacon) {
         List<Beacons.Beacon> beacons=new ArrayList<>(AppRuntime.beacons(activity));
         beacons.removeIf(b->b.id.equals(beacon.id));
         AppRuntime.setBeacons(activity,beacons);
         showChosen(); showNearby(); changed.run();
-    }
-    /**
-     * Listens to one beacon for 10 seconds where the car should start, e.g. beside the driver's door, and offers
-     * 3 dB under the middle reading as its trigger strength, so that spot triggers reliably.
-     */
-    private void calibrate(Beacons.Beacon beacon) {
-        List<Integer> readings=new ArrayList<>();
-        TextView message=new TextView(activity);
-        message.setPadding(64,32,64,0); message.setTextSize(15);
-        message.setText(R.string.calibrate_listening);
-        AlertDialog dialog=new AlertDialog.Builder(activity).setTitle(activity.getString(R.string.calibrate_title,beacon.label)).setView(message)
-            .setNegativeButton("Cancel",null).setPositiveButton("Save",null).create();
-        dialog.setOnDismissListener(d->stop());
-        if(!startScan(result-> {
-            ScanRecord record=result.getScanRecord();
-            String id=Beacons.idFor(result.getDevice().getAddress(),record==null?null:record.getManufacturerSpecificData(0x004C));
-            if(!id.equals(beacon.id)) return;
-            readings.add(result.getRssi());
-            message.setText(activity.getString(R.string.calibrate_progress,readings.size(),result.getRssi()));
-        })) return;
-        dialog.show();
-        Button save=dialog.getButton(AlertDialog.BUTTON_POSITIVE);
-        save.setEnabled(false);
-        handler.postDelayed(()-> {
-            stopScan();
-            try {
-                int strength=Beacons.calibrate(readings);
-                message.setText(activity.getString(R.string.calibrate_result,readings.size(),strength));
-                save.setEnabled(true);
-                save.setOnClickListener(v-> {
-                    List<Beacons.Beacon> beacons=new ArrayList<>(AppRuntime.beacons(activity));
-                    beacons.replaceAll(b->b.id.equals(beacon.id)?b.withThreshold(strength):b);
-                    AppRuntime.setBeacons(activity,beacons);
-                    dialog.dismiss(); showChosen(); changed.run();
-                    toast(beacon.label+" now starts the car at "+strength+" dBm or stronger.");
-                });
-            } catch(IllegalArgumentException tooFew) {
-                message.setText(tooFew.getMessage());
-            }
-        },10000);
     }
     /** Asks for Nearby devices if needed; false when the scan can't start. */
     @android.annotation.SuppressLint("MissingPermission")

@@ -114,7 +114,7 @@ This unlocks and starts the car when your phone comes close to the parked car. I
    - **Start the car when within:** default 15 m.
    - **Re-arm after getting further than:** default 20 m.
    - **Minimum minutes between automatic starts:** default 5.
-   - **Check every:** default 5 seconds. How often the app measures your distance, or scans for the Bluetooth beacon. Shorter reacts sooner but uses more battery. Android can deliver location readings less often than asked, especially indoors.
+   - **Check every:** default 5 seconds. How often the app measures your distance. Shorter reacts sooner but uses more battery. Android can deliver location readings less often than asked, especially indoors.
 3. Tap **Start monitoring**. The app reads the car's position, then follows your phone's location.
 4. Choose **When you walk away, run** (default: Close & lock), or Nothing to turn it off.
 5. Walk away. The next time you come within the start distance, the car unlocks and the action runs.
@@ -174,14 +174,18 @@ Under Settings → **Bluetooth beacons in the car**:
 
 1. Tap **Scan for beacons (20 s)**. **Nearby** lists what the phone hears, beacons first and strongest first, so hold your beacon next to the phone and it's at the top. Each row says what it is: an iBeacon with its major and minor, an Eddystone beacon, or another device.
 2. Tap **Add** next to your beacon. It moves to **Your beacons**, which lists only the beacons you chose. You can add more than one; any of them triggers.
-3. Put the beacon in the car, stand where the car should start (for example beside the driver's door) and tap **Calibrate**. The app listens for 10 seconds and sets the trigger 3 dB under the middle reading, so that spot triggers reliably. Until then a beacon uses −70 dBm.
-4. Tap **Start monitoring**. Monitoring uses GPS and your beacons together.
+3. Put the beacon in the car, stand where the car should start (for example beside the driver's door) and tap **Adjust** next to it. The dialog shows the trigger strength, the signal where you stand right now (green when it's strong enough to start the car, red when not) and how the strength was set.
+   - **Calibrate here (10 s)** listens for 10 seconds and moves the strength to 3 dB under the middle reading, so that spot triggers reliably. It shows what it heard: the middle reading, the range and how many readings.
+   - Change the strength by hand with the slider or the **−**/**+** buttons (1 dB each). Weaker (more negative) starts the car farther away; stronger means you must be closer.
+   - **Save** keeps it. Each beacon in **Your beacons** then shows its strength and how it was set, for example "Calibrated 18 Nov 14:02: middle reading −60 dBm, range −66 to −55 dBm, 25 readings" or "Set by hand 18 Nov 14:05". Until then a beacon uses −70 dBm.
+4. Choose how often to **Listen for your beacons**: nonstop (the default; notices you within a second or two) or every 10, 15, 20, 30 or 60 seconds, listening for 5 seconds each time to save battery. The car can then start up to that many seconds after you arrive. It applies straight away.
+5. Tap **Start monitoring**. Monitoring uses GPS and your beacons together.
 
 How it behaves:
 
 - An iBeacon is recognised by its UUID, major and minor, because its address may change; any other beacon by its address. Use a beacon that broadcasts all the time; tracker tags change their address, and a car's own Bluetooth usually can't be found by this scan.
-- It fires after three strong readings in a row, and is ready again after the beacon was out of range for 60 seconds (two scan intervals with long **Check every** values). A beacon going out of range never runs the walk-away action.
-- With **Check every** below 10 seconds it scans nonstop; from 10 seconds it scans for 5 seconds once per interval to save battery.
+- It fires after three strong readings in a row. It's ready again after the beacon was out of range (more than 10 dB under its strength, or not heard) for 60 seconds, or for two listening rounds when they're more than 30 seconds apart. A beacon going out of range never runs the walk-away action.
+- The log notes how often it listens and each beacon's strength whenever monitoring starts.
 - Signal strength is only a rough guide to distance, and Bluetooth signals can be spoofed.
 ## Updates
 

@@ -8,15 +8,25 @@ public final class Beacons {
     /**
      * A chosen beacon. id is "ibeacon:UUID:major:minor" for an iBeacon, whose address may change, or "mac:ADDRESS" for
      * anything else (e.g. Eddystone), whose address is fixed. threshold: the signal, in dBm, at which you're at the car.
+     * note: how that strength was set, shown in Settings; empty while it's still the default.
      */
     public static final class Beacon {
-        public final String id, label;
+        public final String id, label, note;
         public final int threshold;
-        public Beacon(String id, String label, int threshold) { this.id = id; this.label = label; this.threshold = threshold; }
-        public Beacon withThreshold(int strength) { return new Beacon(id, label, strength); }
+        public Beacon(String id, String label, int threshold, String note) { this.id = id; this.label = label; this.threshold = threshold; this.note = note; }
+        public Beacon withThreshold(int strength, String how) { return new Beacon(id, label, strength, how); }
+    }
+    /** What a calibration heard: the weakest, middle and strongest reading, and the strength it suggests. */
+    public static final class Calibration {
+        public final int readings, weakest, middle, strongest, threshold;
+        Calibration(int readings, int weakest, int middle, int strongest, int threshold) {
+            this.readings = readings; this.weakest = weakest; this.middle = middle; this.strongest = strongest; this.threshold = threshold;
+        }
     }
     /** Until calibrated: a beacon in a car is usually around this strong beside the door. */
     public static final int DEFAULT_THRESHOLD = -70;
+    /** Strengths that can be set: from far (weak) to touching the beacon (strong). */
+    public static final int WEAKEST = -100, STRONGEST = -30;
     /** The iBeacon id in Apple's manufacturer data: 0x02 0x15, UUID, major, minor, power. Null if it's not an iBeacon. */
     public static String iBeaconId(byte[] apple) {
         if (apple == null || apple.length < 23 || apple[0] != 0x02 || apple[1] != 0x15) return null;
@@ -53,12 +63,12 @@ public final class Beacons {
         return "iBeacon · major " + parts[2] + ", minor " + parts[3];
     }
     /** Calibration: 3 dB under the middle reading taken where the car should start, so that spot triggers reliably. */
-    public static int calibrate(List<Integer> rssi) {
+    public static Calibration calibrate(List<Integer> rssi) {
         if (rssi.size() < 3) throw new IllegalArgumentException("Too few readings. Stand closer to the beacon and try again.");
         List<Integer> sorted = new ArrayList<>(rssi);
         Collections.sort(sorted);
         int middle = sorted.get(sorted.size() / 2);
-        return Math.max(-100, Math.min(-30, middle - 3));
+        return new Calibration(sorted.size(), sorted.get(0), middle, sorted.get(sorted.size() - 1), Math.max(WEAKEST, Math.min(STRONGEST, middle - 3)));
     }
     public static List<Beacon> parse(String json) {
         try {
@@ -66,7 +76,8 @@ public final class Beacons {
             List<Beacon> out = new ArrayList<>();
             for (int i = 0; i < array.length(); i++) {
                 JSONObject item = array.getJSONObject(i);
-                out.add(new Beacon(item.getString("id"), item.getString("label"), item.getInt("threshold")));
+                // Beacons saved by build 51 have no note.
+                out.add(new Beacon(item.getString("id"), item.getString("label"), item.getInt("threshold"), item.optString("note", "")));
             }
             return out;
         } catch (JSONException e) { throw new IllegalStateException("Saved beacons are invalid", e); }
@@ -74,7 +85,7 @@ public final class Beacons {
     public static String toJson(List<Beacon> beacons) {
         JSONArray array = new JSONArray();
         for (Beacon beacon : beacons) {
-            try { array.put(new JSONObject().put("id", beacon.id).put("label", beacon.label).put("threshold", beacon.threshold)); }
+            try { array.put(new JSONObject().put("id", beacon.id).put("label", beacon.label).put("threshold", beacon.threshold).put("note", beacon.note)); }
             catch (JSONException e) { throw new IllegalStateException(e); }
         }
         return array.toString();

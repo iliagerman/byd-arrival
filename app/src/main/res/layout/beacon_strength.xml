@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Trigger strength of one beacon: the value (slider and 1 dB steps), the live signal here, how it was set, and Calibrate. -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:paddingHorizontal="24dp" android:paddingTop="8dp">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:gravity="center" android:orientation="horizontal">
+            <Button android:id="@+id/strength_down" style="@style/ButtonText" android:layout_width="56dp"
+                android:layout_marginTop="0dp" android:contentDescription="@string/strength_down" android:text="−" android:textSize="24sp" />
+            <TextView android:id="@+id/strength_value" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:minWidth="140dp" android:gravity="center" android:textColor="@color/on_surface" android:textSize="28sp"
+                android:fontFamily="sans-serif-medium" />
+            <Button android:id="@+id/strength_up" style="@style/ButtonText" android:layout_width="56dp"
+                android:layout_marginTop="0dp" android:contentDescription="@string/strength_up" android:text="+" android:textSize="24sp" />
+        </LinearLayout>
+        <SeekBar android:id="@+id/strength_bar" android:layout_width="match_parent" android:layout_height="48dp" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                android:text="@string/strength_weaker" android:textColor="@color/muted" android:textSize="12sp" />
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                android:gravity="end" android:text="@string/strength_stronger" android:textColor="@color/muted" android:textSize="12sp" />
+        </LinearLayout>
+        <TextView android:id="@+id/strength_meaning" style="@style/Body" android:layout_marginTop="12dp" />
+        <TextView style="@style/FieldLabel" android:text="@string/strength_live_title" />
+        <TextView android:id="@+id/strength_live" style="@style/Body" android:text="@string/nearby_listening"
+            android:textColor="@color/on_surface" android:textSize="16sp" />
+        <TextView style="@style/FieldLabel" android:text="@string/strength_note_title" />
+        <TextView android:id="@+id/strength_note" style="@style/Body" />
+        <Button android:id="@+id/strength_calibrate" style="@style/ButtonTonal" android:text="@string/calibrate_here" />
+        <TextView style="@style/Body" android:layout_marginBottom="8dp" android:text="@string/calibrate_hint" android:textSize="13sp" />
+    </LinearLayout>
+</ScrollView>

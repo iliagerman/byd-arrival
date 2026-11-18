@@ -74,6 +74,9 @@
             <TextView android:id="@+id/beacon_none" style="@style/Body" android:text="@string/beacon_none" />
             <LinearLayout android:id="@+id/beacon_list" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:orientation="vertical" />
+            <TextView style="@style/FieldLabel" android:text="@string/beacon_scan_title" />
+            <Spinner android:id="@+id/beacon_scan" android:layout_width="match_parent" android:layout_height="48dp" android:layout_marginTop="4dp" />
+            <TextView style="@style/Body" android:text="@string/beacon_scan_hint" android:textSize="13sp" />
             <Button android:id="@+id/scan" style="@style/ButtonTonal" android:text="@string/scan" />
             <TextView style="@style/FieldLabel" android:text="@string/nearby_title" />
             <TextView android:id="@+id/nearby_none" style="@style/Body" android:text="@string/nearby_idle" />
