@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Trigger strength of one beacon: the value (slider and 1 dB steps), the live signal here, how it was set, and Calibrate. -->
+<!-- Trigger strength of one beacon: the value (slider and 1 dB steps) and the live signal first, so both fit on a landscape screen; then what it means, how it was set, and Calibrate. -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent" android:layout_height="wrap_content">
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
@@ -21,10 +21,10 @@
             <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
                 android:gravity="end" android:text="@string/strength_stronger" android:textColor="@color/muted" android:textSize="12sp" />
         </LinearLayout>
-        <TextView android:id="@+id/strength_meaning" style="@style/Body" android:layout_marginTop="12dp" />
         <TextView style="@style/FieldLabel" android:text="@string/strength_live_title" />
         <TextView android:id="@+id/strength_live" style="@style/Body" android:text="@string/nearby_listening"
             android:textColor="@color/on_surface" android:textSize="16sp" />
+        <TextView android:id="@+id/strength_meaning" style="@style/Body" android:layout_marginTop="12dp" />
         <TextView style="@style/FieldLabel" android:text="@string/strength_note_title" />
         <TextView android:id="@+id/strength_note" style="@style/Body" />
         <Button android:id="@+id/strength_calibrate" style="@style/ButtonTonal" android:text="@string/calibrate_here" />

@@ -76,11 +76,15 @@ public final class Beacons {
             List<Beacon> out = new ArrayList<>();
             for (int i = 0; i < array.length(); i++) {
                 JSONObject item = array.getJSONObject(i);
-                // Beacons saved by build 51 have no note.
-                out.add(new Beacon(item.getString("id"), item.getString("label"), item.getInt("threshold"), item.optString("note", "")));
+                int threshold = item.getInt("threshold");
+                out.add(new Beacon(item.getString("id"), item.getString("label"), threshold, item.has("note") ? item.getString("note") : earlierNote(threshold)));
             }
             return out;
         } catch (JSONException e) { throw new IllegalStateException("Saved beacons are invalid", e); }
+    }
+    /** Build 51 saved no note, and changed a strength only by calibrating. */
+    static String earlierNote(int threshold) {
+        return threshold == DEFAULT_THRESHOLD ? "" : "Calibrated with an earlier version, which didn't keep the readings.";
     }
     public static String toJson(List<Beacon> beacons) {
         JSONArray array = new JSONArray();

@@ -80,7 +80,8 @@ public class CoreTest {
         check(saved.size() == 2 && saved.get(1).label.equals("CP27-60BC") && saved.get(0).threshold == -63, "chosen beacons and their strengths survive saving");
         check(saved.get(0).note.equals("Calibrated 18 Nov 14:02") && saved.get(1).note.isEmpty(), "how each strength was set survives saving");
         check(saved.get(0).withThreshold(-58, "Set by hand").threshold == -58 && saved.get(0).withThreshold(-58, "Set by hand").note.equals("Set by hand"), "a new strength carries its own note");
-        check(Beacons.parse("[{\"id\":\"mac:48:87:2D:9E:60:BC\",\"label\":\"CP27-60BC\",\"threshold\":-66}]").get(0).note.isEmpty(), "beacons saved before notes existed still load");
+        check(Beacons.parse("[{\"id\":\"mac:48:87:2D:9E:60:BC\",\"label\":\"CP27-60BC\",\"threshold\":-81}]").get(0).note.startsWith("Calibrated with an earlier version"), "a beacon calibrated before notes existed says so");
+        check(Beacons.parse("[{\"id\":\"mac:48:87:2D:9E:60:BC\",\"label\":\"CP27-60BC\",\"threshold\":-70}]").get(0).note.isEmpty(), "an older beacon still at the default shows as the default");
         List<String> calls = new ArrayList<>();
         Routine.run(List.of("OPENDOOR", "OPENAIR"), calls::add);
         check(calls.equals(List.of("OPENDOOR", "OPENAIR")), "runs commands in given order");
