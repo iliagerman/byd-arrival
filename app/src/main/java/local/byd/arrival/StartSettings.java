@@ -4,63 +4,86 @@ import android.app.Activity;
 import android.view.View;
 import android.widget.*;
 import java.util.*;
+import java.util.function.IntConsumer;
 
-/** Settings card for the smart Start car: engine-on time, temperature bands, the five levels and the A/C on temperature. */
+/**
+ * Settings card for the smart Start car: engine-on time, the five temperature ranges (where each starts, A/C, fan,
+ * seat heat) and the A/C on temperature. Numbers are set with − and + so they can't be invalid, and every change
+ * is saved straight away.
+ */
 final class StartSettings {
     private static final int[] MINUTES={10,15,20,25,30};
     private final Activity activity;
-    private final Spinner minutes;
-    private final EditText freezingBelow,coldBelow,warmFrom,hotAbove,fixedTemp;
     private final List<View> levelViews=new ArrayList<>();
+    private ClimatePlan plan;
 
     StartSettings(Activity activity) {
         this.activity=activity;
-        minutes=activity.findViewById(R.id.engine_minutes);
-        freezingBelow=activity.findViewById(R.id.freezing_below); coldBelow=activity.findViewById(R.id.cold_below); warmFrom=activity.findViewById(R.id.warm_from);
-        hotAbove=activity.findViewById(R.id.hot_above); fixedTemp=activity.findViewById(R.id.temperature);
+        plan=AppRuntime.climatePlan(activity);
+        bindMinutes();
+        LinearLayout container=activity.findViewById(R.id.climate_levels);
+        for(int i=0;i<ClimatePlan.NAMES.length;i++) {
+            View view=activity.getLayoutInflater().inflate(R.layout.climate_level,container,false);
+            bindLevel(view,i);
+            container.addView(view); levelViews.add(view);
+        }
+        View fixed=activity.findViewById(R.id.temperature);
+        stepper(fixed,R.string.temperature_label,
+            delta->AppRuntime.prefs(activity).edit().putInt("temperature",ClimatePlan.clamp(fixedTemperature()+delta,ClimatePlan.MIN_AC,ClimatePlan.MAX_AC)).apply());
+        show();
+    }
+    private void bindMinutes() {
+        Spinner minutes=activity.findViewById(R.id.engine_minutes);
         List<String> labels=new ArrayList<>();
         for(int m:MINUTES) labels.add(m+" minutes");
         minutes.setAdapter(new ArrayAdapter<>(activity,android.R.layout.simple_spinner_dropdown_item,labels));
         minutes.setSelection(Arrays.binarySearch(MINUTES,AppRuntime.engineMinutes(activity)));
-        ClimatePlan plan=AppRuntime.climatePlan(activity);
-        freezingBelow.setText(String.valueOf(plan.freezingBelow)); coldBelow.setText(String.valueOf(plan.coldBelow)); warmFrom.setText(String.valueOf(plan.warmFrom));
-        hotAbove.setText(String.valueOf(plan.hotAbove));
-        fixedTemp.setText(String.valueOf(AppRuntime.prefs(activity).getInt("temperature",21)));
-        LinearLayout container=activity.findViewById(R.id.climate_levels);
-        for(ClimatePlan.Level level:plan.levels()) {
-            View view=activity.getLayoutInflater().inflate(R.layout.climate_level,container,false);
-            ((EditText)view.findViewById(R.id.level_temp)).setText(String.valueOf(level.temperature));
-            ((EditText)view.findViewById(R.id.level_fan)).setText(String.valueOf(level.fan));
-            ((CheckBox)view.findViewById(R.id.level_driver)).setChecked(level.driverSeat);
-            ((CheckBox)view.findViewById(R.id.level_passenger)).setChecked(level.passengerSeat);
-            container.addView(view); levelViews.add(view);
-        }
-        titles(plan);
+        minutes.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> parent,View view,int position,long rowId) {
+                AppRuntime.prefs(activity).edit().putInt("engineMinutes",MINUTES[position]).apply();
+            }
+            @Override public void onNothingSelected(AdapterView<?> parent) {}
+        });
     }
-    /** Validates and saves. Throws IllegalArgumentException with a message the user can act on. */
-    void save() {
-        ClimatePlan current=AppRuntime.climatePlan(activity);
-        ClimatePlan.Level[] old=current.levels(), levels=new ClimatePlan.Level[old.length];
-        for(int i=0;i<levels.length;i++) {
+    /** One range. The lowest has no start: it covers everything below the next one. */
+    private void bindLevel(View view,int index) {
+        View from=view.findViewById(R.id.level_from);
+        if(index==0) from.setVisibility(View.GONE);
+        else stepper(from,R.string.level_from,delta->save(plan.withFrom(index,plan.from(index)+delta)));
+        stepper(view.findViewById(R.id.level_temp),R.string.level_temperature,
+            delta->save(plan.withLevel(index,plan.level(index).withTemperature(plan.level(index).temperature+delta))));
+        stepper(view.findViewById(R.id.level_fan),R.string.level_fan,
+            delta->save(plan.withLevel(index,plan.level(index).withFan(plan.level(index).fan+delta))));
+        CheckBox driver=view.findViewById(R.id.level_driver), passenger=view.findViewById(R.id.level_passenger);
+        driver.setChecked(plan.level(index).driverSeat);
+        passenger.setChecked(plan.level(index).passengerSeat);
+        CompoundButton.OnCheckedChangeListener seats=(button,checked)->
+            save(plan.withLevel(index,plan.level(index).withSeats(driver.isChecked(),passenger.isChecked())));
+        driver.setOnCheckedChangeListener(seats);
+        passenger.setOnCheckedChangeListener(seats);
+    }
+    /** Wires − and + to change(−1) and change(+1); the change saves, then everything is shown again. */
+    private void stepper(View row,int label,IntConsumer change) {
+        ((TextView)row.findViewById(R.id.stepper_label)).setText(label);
+        row.findViewById(R.id.stepper_down).setOnClickListener(v-> { change.accept(-1); show(); });
+        row.findViewById(R.id.stepper_up).setOnClickListener(v-> { change.accept(1); show(); });
+    }
+    private void save(ClimatePlan changed) {
+        plan=changed;
+        AppRuntime.prefs(activity).edit().putString("climatePlan",plan.toJson()).apply();
+    }
+    private int fixedTemperature() { return AppRuntime.acOnTemperature(activity); }
+    /** Moving one border can move its neighbours, so every range is shown again after each change. */
+    private void show() {
+        for(int i=0;i<levelViews.size();i++) {
             View view=levelViews.get(i);
-            levels[i]=new ClimatePlan.Level(old[i].name,number(view.findViewById(R.id.level_temp)),number(view.findViewById(R.id.level_fan)),
-                ((CheckBox)view.findViewById(R.id.level_driver)).isChecked(),((CheckBox)view.findViewById(R.id.level_passenger)).isChecked());
+            ClimatePlan.Level level=plan.level(i);
+            ((TextView)view.findViewById(R.id.level_title)).setText(level.name+" · "+plan.band(i));
+            if(i>0) value(view.findViewById(R.id.level_from),plan.from(i)+" °C");
+            value(view.findViewById(R.id.level_temp),level.temperature+" °C");
+            value(view.findViewById(R.id.level_fan),String.valueOf(level.fan));
         }
-        ClimatePlan plan=new ClimatePlan(number(freezingBelow),number(coldBelow),number(warmFrom),number(hotAbove),levels[0],levels[1],levels[2],levels[3],levels[4]);
-        int fixed=number(fixedTemp);
-        if(fixed<15 || fixed>33) throw new IllegalArgumentException("A/C on temperature must be 15–33 °C");
-        AppRuntime.prefs(activity).edit().putString("climatePlan",plan.toJson())
-            .putInt("engineMinutes",MINUTES[minutes.getSelectedItemPosition()]).putInt("temperature",fixed).apply();
-        titles(plan);
+        value(activity.findViewById(R.id.temperature),fixedTemperature()+" °C");
     }
-    private void titles(ClimatePlan plan) {
-        ClimatePlan.Level[] levels=plan.levels();
-        for(int i=0;i<levels.length;i++)
-            ((TextView)levelViews.get(i).findViewById(R.id.level_title)).setText(levels[i].name+" · "+plan.band(levels[i]));
-    }
-    private static int number(View field) {
-        String text=((EditText)field).getText().toString().trim();
-        if(text.isEmpty()) throw new IllegalArgumentException("Fill in every number");
-        return Integer.parseInt(text);
-    }
+    private static void value(View row,String text) { ((TextView)row.findViewById(R.id.stepper_value)).setText(text); }
 }

@@ -131,15 +131,40 @@ public class CoreTest {
         check(AutoStartSettings.restartKm("90000") == 5000, "the restart distance is at most 5000 km");
         check(AutoStartSettings.restartKm("far") == 700, "an unreadable restart distance uses the default");
         ClimatePlan plan = ClimatePlan.defaults();
-        check(plan.choose(16) == plan.freezing && plan.freezing.driverSeat && plan.freezing.temperature == 26, "below 17 °C: warm A/C and driver seat heat");
-        check(plan.choose(17) == plan.cold && !plan.cold.driverSeat && plan.cold.temperature == 26, "17–20 °C: warm A/C, no seat heat");
-        check(plan.choose(20) == plan.mild && plan.mild.temperature == 20 && plan.mild.fan == 3, "20–24 °C: 20 °C, fan 3");
-        check(plan.choose(24) == plan.warm && plan.choose(27) == plan.warm && plan.warm.temperature == 18 && plan.warm.fan == 5, "24–27 °C: 18 °C, fan 5");
-        check(plan.choose(28) == plan.hot && plan.hot.temperature == 17 && plan.hot.fan == 7, "above 27 °C: full cold");
-        check(ClimatePlan.parse("{\"coldBelow\":22,\"warmFrom\":24,\"hotAbove\":27,\"levels\":[]}").freezingBelow == 17, "old four-level settings switch to the new defaults");
-        check(ClimatePlan.parse(plan.toJson()).hot.fan == 7, "start settings survive saving");
-        try { new ClimatePlan(17, 25, 24, 27, plan.freezing, plan.cold, plan.mild, plan.warm, plan.hot); throw new AssertionError("bands must go up"); }
-        catch (IllegalArgumentException expected) { check(true, "bands out of order are rejected"); }
+        check(plan.choose(16) == plan.level(0) && plan.level(0).driverSeat && plan.level(0).temperature == 26, "below 17 °C: warm A/C and driver seat heat");
+        check(plan.choose(17) == plan.level(1) && !plan.level(1).driverSeat && plan.level(1).temperature == 26, "17 to 20 °C: warm A/C, no seat heat");
+        check(plan.choose(20) == plan.level(2) && plan.level(2).temperature == 20 && plan.level(2).fan == 3, "20 to 24 °C: 20 °C, fan 3");
+        check(plan.choose(24) == plan.level(3) && plan.choose(27.9) == plan.level(3) && plan.level(3).temperature == 18 && plan.level(3).fan == 5, "24 to 28 °C: 18 °C, fan 5");
+        check(plan.choose(28) == plan.level(4) && plan.level(4).temperature == 17 && plan.level(4).fan == 7, "28 °C and above: full cold");
+        check(plan.band(0).equals("below 17 °C") && plan.band(2).equals("20 to 24 °C") && plan.band(4).equals("28 °C and above"), "each range says where it starts and ends");
+        ClimatePlan raised = plan.withFrom(2, 23);
+        check(raised.from(2) == 23 && raised.band(1).equals("17 to 23 °C") && raised.from(3) == 24, "moving where Mild starts ends Cold there too");
+        ClimatePlan pushed = plan.withFrom(2, 26);
+        check(pushed.from(2) == 26 && pushed.from(3) == 27 && pushed.from(4) == 28, "raising a border past the next pushes that one up, keeping 1 °C");
+        ClimatePlan lowered = plan.withFrom(3, 16);
+        check(lowered.from(3) == 16 && lowered.from(2) == 15 && lowered.from(1) == 14 && lowered.from(4) == 28, "lowering a border past the one below pushes that one down");
+        check(plan.withFrom(4, 99).from(4) == ClimatePlan.MAX_BORDER && plan.withFrom(1, -99).from(1) == ClimatePlan.MIN_BORDER, "borders stay within limits");
+        check(plan.withFrom(1, -99).withFrom(4, -99).from(4) == ClimatePlan.MIN_BORDER + 3, "pushed borders always leave room for every range");
+        ClimatePlan.Level mild = plan.level(2);
+        check(mild.withTemperature(40).temperature == 33 && mild.withTemperature(10).temperature == 17, "A/C stays within what the car accepts, 17–33 °C");
+        check(mild.withFan(0).fan == 1 && mild.withFan(9).fan == 7 && mild.withSeats(true, true).passengerSeat, "fan stays 1–7; seats switch");
+        check(ClimatePlan.parse(raised.withLevel(4, plan.level(4).withFan(6)).toJson()).from(2) == 23
+            && ClimatePlan.parse(raised.withLevel(4, plan.level(4).withFan(6)).toJson()).level(4).fan == 6, "start settings survive saving");
+        check(ClimatePlan.parse("{\"coldBelow\":22,\"warmFrom\":24,\"hotAbove\":27,\"levels\":[]}").from(1) == 17, "old four-level settings switch to the defaults");
+        String older = "{\"freezingBelow\":12,\"coldBelow\":12,\"warmFrom\":24,\"hotAbove\":27,\"levels\":["
+            + "{\"name\":\"Freezing\",\"temperature\":24,\"fan\":3,\"driverSeat\":true,\"passengerSeat\":false},"
+            + "{\"name\":\"Cold\",\"temperature\":15,\"fan\":3,\"driverSeat\":false,\"passengerSeat\":false},"
+            + "{\"name\":\"Mild\",\"temperature\":17,\"fan\":3,\"driverSeat\":false,\"passengerSeat\":false},"
+            + "{\"name\":\"Warm\",\"temperature\":17,\"fan\":5,\"driverSeat\":false,\"passengerSeat\":false},"
+            + "{\"name\":\"Hot\",\"temperature\":17,\"fan\":7,\"driverSeat\":false,\"passengerSeat\":false}]}";
+        ClimatePlan converted = ClimatePlan.parse(older);
+        check(converted.choose(27) == converted.level(3) && converted.choose(28) == converted.level(4), "older settings keep Hot above 27 °C");
+        check(converted.from(1) == 12 && converted.from(2) == 13, "older equal borders are spread 1 °C apart");
+        check(converted.level(1).temperature == 17 && converted.level(0).temperature == 24 && converted.level(0).driverSeat, "older 15 °C becomes 17 °C, which the car accepts; the rest is kept");
+        try { new ClimatePlan(new int[]{17, 25, 24, 28}, new ClimatePlan.Level[]{mild, mild, mild, mild, mild}); throw new AssertionError("bands must go up"); }
+        catch (IllegalArgumentException expected) { check(true, "ranges out of order are rejected"); }
+        check(Weather.url(32.0853, 34.7818).equals("https://api.open-meteo.com/v1/forecast?latitude=32.09&longitude=34.78&current=temperature_2m"), "the weather request sends the position rounded to about 1 km");
+        check(Weather.currentCelsius("{\"latitude\":32.1,\"current\":{\"time\":\"2026-11-18T15:30\",\"interval\":900,\"temperature_2m\":21.3}}") == 21.3, "reads the current outside temperature");
         java.util.Map<String, Object> air = BydApi.climateParams(21, 17, 5, 30);
         check(air.get("mainSettingTemp").equals(5) && air.get("timeSpan").equals(5) && air.get("windLevel").equals(5), "21 °C on a 17–33 car is scale 5, 30 min, fan 5");
         check(!BydApi.climateParams(20, 17, 0, 10).containsKey("windLevel") && BydApi.climateParams(20, 17, 0, 10).get("timeSpan").equals(1), "fan 0 stays automatic; 10 min is code 1");

@@ -61,6 +61,8 @@ final class AppRuntime {
     static void saveAutoStart(Context c,AutoStartSettings values) {
         prefs(c).edit().putInt("fireMetres",values.start).putInt("rearmMetres",values.rearm).putInt("cooldownMinutes",values.minutes).apply();
     }
+    /** The A/C on button's temperature. Older versions allowed 15–16 °C, which the car refuses, so those become 17. */
+    static int acOnTemperature(Context c) { return ClimatePlan.clamp(prefs(c).getInt("temperature",21),ClimatePlan.MIN_AC,ClimatePlan.MAX_AC); }
     static int engineMinutes(Context c) { return prefs(c).getInt("engineMinutes",30); }
     static int icon(String code) {
         switch(code) {
@@ -257,7 +259,7 @@ final class AppRuntime {
             case "START": smartStart(c,client,vin,notes); return;
             case "SECURE": closeAndLock(c,client,vin); return;
             case "OPENAIR": {
-                int temperature=prefs(c).getInt("temperature",21);
+                int temperature=acOnTemperature(c);
                 JSONObject climate=client.climate(vin);
                 status(c,"Starting A/C at "+temperature+" °C…");
                 client.command(vin,"OPENAIR",BydApi.climateParams(temperature,climate.getInt("vdeTempRangeMin"),0,engineMinutes(c)));
@@ -274,22 +276,43 @@ final class AppRuntime {
                 client.command(vin,step,null);
         }
     }
-    /** Reads the cabin temperature (outside if the car has none), picks a level, starts the A/C, then the chosen seat heat. */
+    /**
+     * Reads the cabin temperature, picks a level, starts the A/C, then the level's seat heat. Without a cabin reading
+     * (the car has none while asleep, and then reports a made-up 0 °C outside) it uses the outside temperature at the
+     * car from the weather service, and the Mild level if that fails too.
+     */
     private static void smartStart(Context c,BydApi client,String vin,List<String> notes) throws Exception {
         status(c,"Reading the car's temperature…");
         JSONObject climate=client.climate(vin);
-        int cabin=climate.optInt("tempInCar",NO_READING), outside=climate.optInt("tempOutCar",NO_READING);
+        int cabin=climate.optInt("tempInCar",NO_READING);
         ClimatePlan plan=climatePlan(c);
         String source; ClimatePlan.Level level;
         if(cabin!=NO_READING) { source="cabin "+cabin+" °C"; level=plan.choose(cabin); }
-        else if(outside!=NO_READING) { source="outside "+outside+" °C"; level=plan.choose(outside); }
-        else { source="no temperature reading"; level=plan.mild; }
+        else {
+            Double outside=weatherAtCar(c,client,vin);
+            if(outside!=null) { source="no cabin reading, outside "+Math.round(outside)+" °C (weather)"; level=plan.choose(outside); }
+            else { source="no temperature reading"; level=plan.level(ClimatePlan.MILD); }
+        }
         status(c,"Starting: "+level.name.toLowerCase(Locale.ROOT)+", A/C "+level.temperature+" °C, fan "+level.fan+"…");
         client.command(vin,"OPENAIR",BydApi.climateParams(level.temperature,climate.getInt("vdeTempRangeMin"),level.fan,engineMinutes(c)));
         notes.add(source+" → "+level.name+": A/C "+level.temperature+" °C, fan "+level.fan);
         if(level.driverSeat || level.passengerSeat) {
             seatHeat(c,client,vin,climate,level.driverSeat,level.passengerSeat);
-            notes.add("seat heat");
+            notes.add("seat heat "+(level.driverSeat && level.passengerSeat?"both":level.driverSeat?"driver":"passenger"));
+        }
+    }
+    /**
+     * Outside temperature at the car's last known position (read once from BYD if monitoring never saved one), or null
+     * when the position or the weather service fails; that is logged and Start car goes on with the Mild level.
+     */
+    private static Double weatherAtCar(Context c,BydApi client,String vin) {
+        try {
+            double[] car=savedCar(c);
+            if(car==null) car=BydApi.position(client.gpsInfo(vin));
+            return Weather.outside(car[0],car[1]);
+        } catch(Exception error) {
+            log(c,"weather lookup failed: "+safeError(error));
+            return null;
         }
     }
     /** Sends every Close & lock step even if one fails, so a rejected A/C off or tailgate close can't leave the car unlocked. */

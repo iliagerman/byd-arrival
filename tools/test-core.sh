@@ -11,7 +11,7 @@ mkdir -p "$out"
 [ -f "$jar" ] || curl -fsSL -o "$jar" https://repo1.maven.org/maven2/org/json/json/20240303/json-20240303.jar
 echo "3cf6cd6892e32e2b4c1c39e0f52f5248a2f5b37646fdfbb79a66b46b618414ed  $jar" | shasum -a 256 -c - >/dev/null
 javac -nowarn -cp "$jar" -d "$out" \
-  "$src/Bangcle.java" "$src/Crypto.java" "$src/BydApi.java" "$src/Actions.java" "$src/ClimatePlan.java" \
+  "$src/Bangcle.java" "$src/Crypto.java" "$src/BydApi.java" "$src/Actions.java" "$src/ClimatePlan.java" "$src/Weather.java" \
   "$src/Routine.java" "$src/ArrivalGate.java" "$src/Beacons.java" "$src/ProximityGate.java" "$src/UpdateCheck.java" "$src/Regions.java" "$src/AutoStartSettings.java" \
   "$tests/CoreTest.java" "$tests/ApiTest.java" tools/*.java
 java -cp "$jar:$out" local.byd.arrival.CoreTest "$tables" tools/cipher-vectors.txt

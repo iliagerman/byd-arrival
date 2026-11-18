@@ -20,7 +20,6 @@ import java.util.*;
 /** Account, start car, actions, widget, automation and phone settings. Secure window: credentials are typed here. */
 public final class SettingsActivity extends Activity {
     private static final int GUIDE=5;
-    private StartSettings start;
     private BeaconSettings beacons;
     private TextView accountState;
 
@@ -34,16 +33,12 @@ public final class SettingsActivity extends Activity {
         showWifi();
         bindAbroad();
         ((EditText)findViewById(R.id.wifi_signal)).setText(String.valueOf(AppRuntime.wifiSignal(this)));
-        start=new StartSettings(this);
+        new StartSettings(this);
         new ActionSettings(this);
         beacons=new BeaconSettings(this,this::restartIfMonitoring);
         click(R.id.back,this::finish);
         click(R.id.save_account,()->SignIn.show(this,this::refresh));
         click(R.id.change_car,()->SignIn.changeCar(this,this::refresh));
-        click(R.id.save_start,()-> {
-            try { start.save(); toast("Start settings saved."); }
-            catch(IllegalArgumentException e) { toast(e.getMessage()); }
-        });
         click(R.id.add_wifi,this::addCurrentWifi);
         click(R.id.monitor_gps,this::enableMonitor);
         click(R.id.auto_guide,()->startActivityForResult(new Intent(this,WelcomeActivity.class),GUIDE));

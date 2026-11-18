@@ -87,19 +87,26 @@ Shows the latest status, the auto-start state, a large **Start car** button and 
 
 ### Start car
 
-Start car reads the cabin temperature (or the outside temperature if the car has no cabin reading), picks a level and starts the A/C. If the car reports neither, it uses the Mild level. You can edit everything under Settings → **START CAR**:
+Start car reads the cabin temperature, picks the matching range and starts the A/C with that range's settings.
 
-| Level | Default range | A/C | Fan | Seat heat |
+- **No cabin reading:** the car has none while it's asleep, and then reports 0 °C outside, which isn't real. So the app asks a free weather service (Open-Meteo, no account) for the outside temperature at the car's last known position, rounded to about 1 km. If that fails too, it uses the Mild range. The result says which it used, for example `no cabin reading, outside 21 °C (weather) → Mild`.
+- Edit everything under Settings → **START CAR**. Every change is saved straight away, so there's no Save button.
+
+| Range | Default | A/C | Fan | Seat heat |
 |---|---|---|---|---|
 | Freezing | below 17 °C | 26 °C | 3 | driver |
-| Cold | 17–20 °C | 26 °C | 3 | off |
-| Mild | 20–24 °C | 20 °C | 3 | off |
-| Warm | 24–27 °C | 18 °C | 5 | off |
-| Hot | above 27 °C | 17 °C | 7 | off |
+| Cold | 17 to 20 °C | 26 °C | 3 | off |
+| Mild | 20 to 24 °C | 20 °C | 3 | off |
+| Warm | 24 to 28 °C | 18 °C | 5 | off |
+| Hot | 28 °C and above | 17 °C | 7 | off |
 
-- **Seat heat:** driver and passenger can be switched separately for each level.
-- **Temperature limits:** the car reports the range it accepts (17–33 °C on the Atto 3). A value outside that range gives an error and isn't sent.
+A range includes its start and stops just before the next one starts: Mild covers 20 °C up to, but not including, 24 °C.
+
+- **Where each range starts:** set with **−** and **+**. The range below then ends there automatically, so there's one border to set per range and they can't overlap or leave a gap. Moving a border past the next one pushes that one along, keeping every range at least 1 °C wide.
+- **A/C and fan:** also set with **−** and **+**, within what the car accepts: A/C 17–33 °C on the Atto 3, fan 1–7. Values from older versions below 17 °C become 17 °C.
+- **Seat heat:** driver and passenger can be switched separately for each range. Seat heat is turned on at high.
 - **Engine-on time:** 10 to 30 minutes in steps of 5, default 30. It applies to **Start car** and **A/C on**.
+- **A/C on button:** its own temperature, also 17–33 °C, with the fan on automatic.
 
 ### Custom actions
 
@@ -201,7 +208,7 @@ Tapping either one downloads the APK in your browser. Open the file to install i
 - **Your credentials stay on the phone, encrypted.** The email, password and PIN are encrypted with a key held in Android Keystore, and are excluded from Android backups.
 - **They can be used while the phone is locked.** Auto-start needs this. It also means anyone who can reach your widget can control your car without entering a PIN. Keep a screen lock on your phone.
 - **Auto-start can act without you.** Anyone carrying your unlocked or locked phone near the car can trigger it, and it unlocks the doors. GPS and Bluetooth signals can be spoofed.
-- **The network traffic is limited.** The app connects only to BYD's server for your region and to GitHub (for the version check and downloads). There are no analytics or ads, and your location is only used on the phone to work out the distance.
+- **The network traffic is limited.** The app connects only to BYD's server for your region, to GitHub (for the version check and downloads) and, when Start car gets no cabin reading from the car, to Open-Meteo for the outside temperature. Open-Meteo gets the car's position rounded to about 1 km, nothing else. There are no analytics or ads, and your phone's location is only used on the phone to work out the distance.
 - **To erase your data,** use Settings → **Forget credentials**, or uninstall the app.
 
 ## Troubleshooting
