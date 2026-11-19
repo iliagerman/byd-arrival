@@ -24,7 +24,10 @@ final class AppRuntime {
     static String arrivalAction(Context c) { return prefs(c).getString("arrivalAction",Actions.DEFAULT_ARRIVAL); }
     /** What runs when you walk away after an auto-start. Default: Close & lock. Empty: nothing. */
     static String leaveAction(Context c) { return prefs(c).getString("leaveAction","SECURE"); }
-    /** Widget buttons, in order (up to ten). Older versions kept a separate main button; it becomes the first button. */
+    /**
+     * Widget buttons, in order (up to ten). Until you choose: Start car, Turn off, Unlock, Lock, Close & lock. Older
+     * versions kept a separate main button; it becomes the first button.
+     */
     static List<String> widgetTiles(Context c) {
         SharedPreferences prefs=prefs(c);
         if(prefs.contains("widgetMain")) {
@@ -32,7 +35,7 @@ final class AppRuntime {
             for(String code:prefs.getString("widgetTiles","").split(",")) if(!code.isEmpty() && !tiles.contains(code)) tiles.add(code);
             prefs.edit().putString("widgetTiles",String.join(",",tiles)).remove("widgetMain").apply();
         }
-        String saved=prefs.getString("widgetTiles","START,CLOSEAIR,OPENDOOR,LOCKDOOR,FINDCAR");
+        String saved=prefs.getString("widgetTiles","START,CLOSEAIR,OPENDOOR,LOCKDOOR,SECURE");
         return saved.isEmpty()?List.of():Arrays.asList(saved.split(","));
     }
     static ClimatePlan climatePlan(Context c) {
