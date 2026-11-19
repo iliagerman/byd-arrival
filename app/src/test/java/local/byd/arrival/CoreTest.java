@@ -143,10 +143,10 @@ public class CoreTest {
         check(AutoStartSettings.restartKm("90000") == 5000, "the restart distance is at most 5000 km");
         check(AutoStartSettings.restartKm("far") == 700, "an unreadable restart distance uses the default");
         ClimatePlan plan = ClimatePlan.defaults();
-        check(plan.choose(16) == plan.level(0) && plan.level(0).driverHeat == ClimatePlan.HIGH && plan.level(0).passengerHeat == ClimatePlan.OFF && plan.level(0).temperature == 26, "below 17 °C: warm A/C and driver seat heat high");
+        check(plan.choose(16) == plan.level(0) && plan.level(0).driverHeat == ClimatePlan.HIGH && plan.level(0).passengerHeat == ClimatePlan.OFF && plan.level(0).temperature == 24, "below 17 °C: A/C 24 °C and driver seat heat high");
         check(plan.choose(17) == plan.level(1) && plan.level(1).driverHeat == ClimatePlan.OFF && plan.level(1).temperature == 26, "17 to 20 °C: warm A/C, no seat heat");
-        check(plan.choose(20) == plan.level(2) && plan.level(2).temperature == 20 && plan.level(2).fan == 3, "20 to 24 °C: 20 °C, fan 3");
-        check(plan.choose(24) == plan.level(3) && plan.choose(27.9) == plan.level(3) && plan.level(3).temperature == 18 && plan.level(3).fan == 5, "24 to 28 °C: 18 °C, fan 5");
+        check(plan.choose(20) == plan.level(2) && plan.level(2).temperature == 17 && plan.level(2).fan == 3, "20 to 24 °C: 17 °C, fan 3");
+        check(plan.choose(24) == plan.level(3) && plan.choose(27.9) == plan.level(3) && plan.level(3).temperature == 17 && plan.level(3).fan == 5, "24 to 28 °C: 17 °C, fan 5");
         check(plan.choose(28) == plan.level(4) && plan.level(4).temperature == 17 && plan.level(4).fan == 7, "28 °C and above: full cold");
         check(plan.band(0).equals("below 17 °C") && plan.band(2).equals("20 to 24 °C") && plan.band(4).equals("28 °C and above"), "each range says where it starts and ends");
         ClimatePlan raised = plan.withFrom(2, 23);

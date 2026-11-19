@@ -42,10 +42,10 @@ public final class ClimatePlan {
     }
     public static ClimatePlan defaults() {
         return new ClimatePlan(new int[]{17, 20, 24, 28}, new Level[]{
-            new Level("Freezing", 26, 3, HIGH, OFF),
+            new Level("Freezing", 24, 3, HIGH, OFF),
             new Level("Cold", 26, 3, OFF, OFF),
-            new Level("Mild", 20, 3, OFF, OFF),
-            new Level("Warm", 18, 5, OFF, OFF),
+            new Level("Mild", 17, 3, OFF, OFF),
+            new Level("Warm", 17, 5, OFF, OFF),
             new Level("Hot", 17, 7, OFF, OFF)});
     }
     public Level choose(double celsius) {

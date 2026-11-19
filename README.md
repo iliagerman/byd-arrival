@@ -99,10 +99,10 @@ Start car reads the cabin temperature, picks the matching range and starts the A
 
 | Range | Default | A/C | Fan | Seat heat |
 |---|---|---|---|---|
-| Freezing | below 17 °C | 26 °C | 3 | driver high |
+| Freezing | below 17 °C | 24 °C | 3 | driver high |
 | Cold | 17 to 20 °C | 26 °C | 3 | off |
-| Mild | 20 to 24 °C | 20 °C | 3 | off |
-| Warm | 24 to 28 °C | 18 °C | 5 | off |
+| Mild | 20 to 24 °C | 17 °C | 3 | off |
+| Warm | 24 to 28 °C | 17 °C | 5 | off |
 | Hot | 28 °C and above | 17 °C | 7 | off |
 
 A range includes its start and stops just before the next one starts: Mild covers 20 °C up to, but not including, 24 °C.
