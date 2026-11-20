@@ -22,7 +22,7 @@ You need:
 | **Start car** | Smart climate start, described [below](#start-car). BYD has no remote engine-start command, so starting the A/C is what powers the car on. This is remote mode: to drive, you need the key, or tap **Turn off**, then **Unlock**, then start the car yourself. |
 | **Turn off** | A/C off, and nothing else. On the Atto 3 this also shuts the car down. |
 | **Unlock** / **Lock** | Unlocks or locks the doors. |
-| **Close & lock** | Turns the car off (A/C off), closes the windows and the tailgate, then locks. Every step is sent even if one fails, so a failure can't leave the car unlocked; the result lists what failed. |
+| **Close & lock** | Turns the car off (A/C off), closes the windows and the tailgate, then locks. It closes the tailgate only if the car doesn't report it closed already, because BYD refuses to close a closed tailgate (code 6088); the result then says `tailgate already closed`. Every step is sent even if one fails, so a failure can't leave the car unlocked; the result lists what failed. |
 | **Open trunk** / **Close trunk** | Opens or closes the trunk. |
 | **A/C on** | Starts the A/C at one fixed temperature that you choose. |
 | **Driver seat heat** / **Passenger seat heat** | Turns that seat's heating on, at high. |

@@ -276,7 +276,7 @@ final class AppRuntime {
     private static void runStep(Context c,BydApi client,String vin,String step,List<String> notes) throws Exception {
         switch(step) {
             case "START": smartStart(c,client,vin,notes); return;
-            case "SECURE": closeAndLock(c,client,vin); return;
+            case "SECURE": closeAndLock(c,client,vin,notes); return;
             case "OPENAIR": {
                 int temperature=acOnTemperature(c);
                 JSONObject climate=client.climate(vin);
@@ -334,14 +334,29 @@ final class AppRuntime {
             return null;
         }
     }
-    /** Sends every Close & lock step even if one fails, so a rejected A/C off or tailgate close can't leave the car unlocked. */
-    private static void closeAndLock(Context c,BydApi client,String vin) throws Exception {
-        Map<String,Exception> failed=Routine.runAll(Actions.CLOSE_AND_LOCK,step-> { status(c,Actions.progress(step)); client.command(vin,step,null); });
+    /**
+     * Sends every Close & lock step even if one fails, so a rejected A/C off can't leave the car unlocked. The tailgate
+     * is closed unless the car reports it closed already: BYD refuses closing a closed one (code 6088, seen on every
+     * walk-away, 20 Nov), which made the whole action show as failed.
+     */
+    private static void closeAndLock(Context c,BydApi client,String vin,List<String> notes) throws Exception {
+        List<String> steps=new ArrayList<>(Actions.CLOSE_AND_LOCK);
+        if(tailgateClosed(c,client,vin)) { steps.remove("CLOSETRUNK"); notes.add("tailgate already closed"); }
+        Map<String,Exception> failed=Routine.runAll(steps,step-> { status(c,Actions.progress(step)); client.command(vin,step,null); });
         if(failed.isEmpty()) return;
         List<String> lines=new ArrayList<>();
         failed.forEach((step,error)->lines.add(Actions.BUILT_IN.get(step)+": "+safeError(error)));
-        boolean others=failed.size()<Actions.CLOSE_AND_LOCK.size();
+        boolean others=failed.size()<steps.size();
         throw new IOException("Command failed in Close & lock. "+String.join(" ",lines)+(others?" The other steps were confirmed.":""));
+    }
+    /** From the car's live data (read-only). If it can't be read, the tailgate is closed anyway, as before. */
+    private static boolean tailgateClosed(Context c,BydApi client,String vin) {
+        status(c,"Checking the tailgate…");
+        try { return BydApi.tailgateClosed(client.realtime(vin)); }
+        catch(Exception error) {
+            log(c,"tailgate check failed, closing it anyway: "+safeError(error));
+            return false;
+        }
     }
     /**
      * Reads the car's battery level (read-only) for the widget, then runs done. A failure keeps the last level and is

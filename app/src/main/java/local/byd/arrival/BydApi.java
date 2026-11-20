@@ -162,6 +162,8 @@ public final class BydApi {
      * the same, and turning off a car left on is what walking away is for.
      */
     static boolean standingStill(JSONObject data) { return data.optDouble("speed",-1)==0; }
+    /** From live data: the tailgate is reported closed (trunkLid 0; 1 is open and -1 unknown, per pyBYD). */
+    static boolean tailgateClosed(JSONObject data) { return data.optInt("trunkLid",-1)==0; }
     /** Battery level in percent, or -1 when the car sent none (BYD uses -1 after the car wakes or sleeps deeply). */
     static int batteryPercent(JSONObject data) {
         double percent=data.optDouble("elecPercent",-1);

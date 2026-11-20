@@ -192,6 +192,9 @@ public class CoreTest {
         check(!BydApi.standingStill(new org.json.JSONObject().put("powerGear", 1).put("speed", 12.5)), "moving: someone is driving, so walk-away sends nothing");
         check(BydApi.standingStill(new org.json.JSONObject().put("powerGear", 3).put("speed", 0)), "switched on but standing (remote A/C, or left on): walking away may turn it off");
         check(!BydApi.standingStill(new org.json.JSONObject().put("powerGear", 1)) && !BydApi.standingStill(new org.json.JSONObject().put("speed", -1)), "speed not reported: may be moving, so nothing is sent");
+        check(BydApi.tailgateClosed(new org.json.JSONObject().put("trunkLid", 0)), "tailgate reported closed: Close & lock skips closing it (BYD refuses with 6088)");
+        check(!BydApi.tailgateClosed(new org.json.JSONObject().put("trunkLid", 1)) && !BydApi.tailgateClosed(new org.json.JSONObject().put("trunkLid", -1))
+            && !BydApi.tailgateClosed(new org.json.JSONObject()), "tailgate open or unknown: Close & lock closes it");
         check(ProximityGate.beyondBeacon(1500, 20) && !ProximityGate.beyondBeacon(900, 5), "over 1 km from the car Bluetooth rests; within it, it listens");
         check(!ProximityGate.beyondBeacon(1100, 300), "a rough reading that could be within 1 km keeps Bluetooth listening");
         check(ProximityGate.leftWhereYouWere(40, 8) && ProximityGate.leftWhereYouWere(55, 10), "car still where you were with it, within GPS error: you walked away");
