@@ -57,7 +57,7 @@ public final class MonitorService extends Service {
             int signal=caps.getSignalStrength();
             if(name!=null) handler.post(()->wifiChanged(name,signal));
         }
-        @Override public void onLost(Network network) { handler.post(()->currentWifi=null); }
+        @Override public void onLost(Network network) { handler.post(()-> { currentWifi=null; syncWifiPause(); }); }
     };
     private BluetoothLeScanner scanner;
     private List<Beacons.Beacon> beacons=List.of();
@@ -65,11 +65,17 @@ public final class MonitorService extends Service {
     private ArrivalGate beaconGate;
     private List<ScanFilter> filters;
     private long started, scanEveryMs;
+    /**
+     * Power saving: on a trusted Wi-Fi with nothing left to do, location and Bluetooth pause (wifiPaused); more than
+     * 1 km from the car, Bluetooth alone pauses (farFromCar). beaconScanning: Bluetooth is listening now.
+     */
+    private boolean wifiPaused, farFromCar, beaconScanning;
     private final Handler handler=new Handler(Looper.getMainLooper());
     /** Once a second: has the beacon been out of range long enough, with GPS agreeing you're away from the car? */
     private final Runnable tick=new Runnable() {
         @Override public void run() {
-            if(beaconGate.absent(SystemClock.elapsedRealtime()-started) && awayFromCar()) beaconGone();
+            // While Bluetooth rests the beacon only seems gone, so it decides nothing then.
+            if(beaconScanning && beaconGate.absent(SystemClock.elapsedRealtime()-started) && awayFromCar()) beaconGone();
             handler.postDelayed(this,1000);
         }
     };
@@ -138,17 +144,8 @@ public final class MonitorService extends Service {
         walkAwayPending=prefs.getBoolean("walkAwayPending",false);
         showProximity("No fix",System.currentTimeMillis());
         locations=getSystemService(LocationManager.class);
-        LocationRequest request=new LocationRequest.Builder(AppRuntime.intervalSeconds(this)*1000L).setQuality(LocationRequest.QUALITY_HIGH_ACCURACY).build();
-        // Fused adds Wi-Fi and cell positions, so readings keep coming indoors. GPS is asked separately, because fused can
-        // fall back to a rough network position (seen: 1991 m off for minutes beside the car) while satellites are available.
-        if(locations.hasProvider(LocationManager.FUSED_PROVIDER)) {
-            fusedListener=this::onFix;
-            locations.requestLocationUpdates(LocationManager.FUSED_PROVIDER,request,getMainExecutor(),fusedListener);
-        }
-        if(locations.hasProvider(LocationManager.GPS_PROVIDER)) {
-            satelliteListener=this::onFix;
-            locations.requestLocationUpdates(LocationManager.GPS_PROVIDER,request,getMainExecutor(),satelliteListener);
-        }
+        wifiPaused=false; farFromCar=false;
+        startLocationUpdates();
         connectivity=getSystemService(ConnectivityManager.class);
         connectivity.registerNetworkCallback(new NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build(),wifiCallback);
         startBeacons();
@@ -163,11 +160,60 @@ public final class MonitorService extends Service {
     /** Stops location readings and Wi-Fi arming, before switching between normal and paused tracking. */
     private void stopTracking() {
         stopBeacons();
+        stopLocationUpdates();
+        wifiPaused=false; farFromCar=false;
+        if(connectivity!=null) connectivity.unregisterNetworkCallback(wifiCallback);
+        connectivity=null;
+    }
+    /**
+     * Fused adds Wi-Fi and cell positions, so readings keep coming indoors. GPS is asked separately, because fused can
+     * fall back to a rough network position (seen: 1991 m off for minutes beside the car) while satellites are available.
+     * Permission was checked in beginGps.
+     */
+    @android.annotation.SuppressLint("MissingPermission")
+    private void startLocationUpdates() {
+        LocationRequest request=new LocationRequest.Builder(AppRuntime.intervalSeconds(this)*1000L).setQuality(LocationRequest.QUALITY_HIGH_ACCURACY).build();
+        if(locations.hasProvider(LocationManager.FUSED_PROVIDER)) {
+            fusedListener=this::onFix;
+            locations.requestLocationUpdates(LocationManager.FUSED_PROVIDER,request,getMainExecutor(),fusedListener);
+        }
+        if(locations.hasProvider(LocationManager.GPS_PROVIDER)) {
+            satelliteListener=this::onFix;
+            locations.requestLocationUpdates(LocationManager.GPS_PROVIDER,request,getMainExecutor(),satelliteListener);
+        }
+    }
+    private void stopLocationUpdates() {
         if(fusedListener!=null) locations.removeUpdates(fusedListener);
         if(satelliteListener!=null) locations.removeUpdates(satelliteListener);
         fusedListener=null; satelliteListener=null;
-        if(connectivity!=null) connectivity.unregisterNetworkCallback(wifiCallback);
-        connectivity=null;
+    }
+    /**
+     * On a trusted Wi-Fi, armed, with no walk-away action left to run, nothing can happen: auto-start never fires on a
+     * trusted Wi-Fi. Location readings and Bluetooth then pause until the phone leaves that Wi-Fi. A walk-away still due
+     * (you parked at home and walked in) keeps them on until it's decided.
+     */
+    private void syncWifiPause() {
+        if(connectivity==null) return; // not tracking: abroad mode, or restarting
+        boolean pause=onTrustedWifi() && proximity.armed() && !walkAwayPending;
+        if(pause==wifiPaused) return;
+        wifiPaused=pause;
+        if(pause) stopLocationUpdates(); else startLocationUpdates();
+        syncBeaconScan();
+        AppRuntime.proximityEvent(this,pause?"Armed on "+currentWifi+": location and Bluetooth paused":"Left trusted Wi-Fi: location and Bluetooth back on");
+        showProximity(pause?"Paused on "+currentWifi:"No fix",System.currentTimeMillis());
+    }
+    /**
+     * Bluetooth listens unless it can't matter: paused on a trusted Wi-Fi, or more than 1 km from the car, where the
+     * beacon can't be heard. Otherwise it listens as chosen in Settings, nonstop by default.
+     */
+    private void syncBeaconScan() {
+        if(beaconGate==null) return;
+        boolean listen=!wifiPaused && !farFromCar;
+        if(listen==beaconScanning) return;
+        beaconScanning=listen;
+        if(listen) { if(scanEveryMs==0) startScan(); else handler.post(scanRound); }
+        else { handler.removeCallbacks(scanRound); handler.removeCallbacks(stopRound); stopScan(); }
+        AppRuntime.log(this,"Bluetooth "+(listen?"listening":"paused: "+(wifiPaused?"trusted Wi-Fi":"over 1 km from the car")));
     }
     /** Saves the disarmed state before any start, so a restart cannot repeat a start. */
     private void onFix(Location fix) {
@@ -189,6 +235,8 @@ public final class MonitorService extends Service {
         String shown=withCar && !proximity.armed()?"With the car":Math.round(metres)+" m"+(rough?" ±"+Math.round(fix.getAccuracy()):"");
         showProximity(shown,System.currentTimeMillis()-age);
         String reading=Math.round(metres)+" m ±"+Math.round(fix.getAccuracy())+" m";
+        // Over 1 km from the car Bluetooth rests; not while you travel with it, since its saved spot lags behind then.
+        if(!late) { farFromCar=ProximityGate.beyondBeacon(metres,fix.getAccuracy()) && !withCar && !onTrip; syncBeaconScan(); }
         if(event==ProximityGate.Event.LEFT) checkCar(reading,60000,false,false);
         // Leaving is only seen after a good reading beside the car. Without one (GPS is often rough there), the car could
         // be driven off unnoticed, so while you're in a vehicle the app also checks whether the car moves with you.
@@ -351,6 +399,7 @@ public final class MonitorService extends Service {
                 AppRuntime.prefs(this).edit().putBoolean("gateArmed",true).commit();
                 if(!wasArmed) AppRuntime.proximityEvent(this,"Armed by distance: "+reading);
                 showProximity(lastDistance,lastDistanceAt);
+                syncWifiPause();
                 // Only if you were with the car: it never locks or turns off a car someone else is using (seen 17:18).
                 if(result!=ProximityGate.CarCheck.WALKED_AWAY) return;
                 // A beacon at full strength in the last 15 s says you're at the car, whatever GPS says: Bluetooth decides then.
@@ -391,6 +440,7 @@ public final class MonitorService extends Service {
         AppRuntime.prefs(this).edit().putBoolean("gateArmed",true).commit();
         if(!wasArmed) AppRuntime.proximityEvent(this,"Armed by Bluetooth: beacon out of range, car "+moved+" m from its saved spot");
         showProximity(lastDistance,lastDistanceAt);
+        syncWifiPause();
         double drift=ProximityGate.metres(car[0],car[1],were.getLatitude(),were.getLongitude());
         if(!ProximityGate.leftWhereYouWere(drift,were.getAccuracy())) {
             if(walkAwayPending) {
@@ -405,6 +455,7 @@ public final class MonitorService extends Service {
     private void setWalkAwayPending(boolean pending) {
         walkAwayPending=pending;
         AppRuntime.prefs(this).edit().putBoolean("walkAwayPending",pending).commit();
+        syncWifiPause();
     }
     /**
      * Runs the walk-away action at most once per stay: the first confirmed departure takes it, so the beacon and the
@@ -461,16 +512,18 @@ public final class MonitorService extends Service {
     private void wifiChanged(String name,int signal) {
         boolean joined=!name.equals(currentWifi);
         currentWifi=name;
-        if(!onTrustedWifi() || proximity.armed()) return;
-        if(signal<AppRuntime.wifiSignal(this)) {
-            if(joined) AppRuntime.proximityEvent(this,"Wi-Fi "+name+" too weak to arm: "+signal+" dBm");
-            return;
+        if(onTrustedWifi() && !proximity.armed()) {
+            if(signal<AppRuntime.wifiSignal(this)) {
+                if(joined) AppRuntime.proximityEvent(this,"Wi-Fi "+name+" too weak to arm: "+signal+" dBm");
+            } else {
+                proximity.arm();
+                if(beaconGate!=null) { beaconGate.arm(); saveBeaconArmed(); }
+                AppRuntime.prefs(this).edit().putBoolean("gateArmed",true).commit();
+                AppRuntime.proximityEvent(this,"Armed by Wi-Fi "+name+": "+signal+" dBm");
+                showProximity(lastDistance,lastDistanceAt);
+            }
         }
-        proximity.arm();
-        if(beaconGate!=null) { beaconGate.arm(); saveBeaconArmed(); }
-        AppRuntime.prefs(this).edit().putBoolean("gateArmed",true).commit();
-        AppRuntime.proximityEvent(this,"Armed by Wi-Fi "+name+": "+signal+" dBm");
-        showProximity(lastDistance,lastDistanceAt);
+        syncWifiPause();
     }
     /** Minimum minutes between automatic starts, so passing the car again soon does not start it again. */
     private boolean cooldownPassed() {
@@ -510,7 +563,8 @@ public final class MonitorService extends Service {
                 :new ScanFilter.Builder().setDeviceAddress(Beacons.address(beacon.id)).build());
         }
         scanEveryMs=seconds*1000L;
-        if(seconds==0) startScan(); else handler.post(scanRound);
+        beaconScanning=false;
+        syncBeaconScan();
         handler.post(tick);
         List<String> strengths=new ArrayList<>();
         for(Beacons.Beacon beacon:beacons) strengths.add(beacon.label+" at "+beacon.threshold+" dBm");
@@ -594,7 +648,8 @@ public final class MonitorService extends Service {
     private void stopBeacons() {
         if(beaconGate==null) return;
         handler.removeCallbacks(tick); handler.removeCallbacks(scanRound); handler.removeCallbacks(stopRound);
-        stopScan();
+        if(beaconScanning) stopScan();
+        beaconScanning=false;
         beaconGate=null;
     }
     private void stopWithStatus(String message) { AppRuntime.status(this,message); stopSelf(); }

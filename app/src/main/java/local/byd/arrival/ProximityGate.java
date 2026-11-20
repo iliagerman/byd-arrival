@@ -79,6 +79,11 @@ public final class ProximityGate {
     public static boolean leftWhereYouWere(double carToWhereYouWereMetres,float accuracyMetres) {
         return carToWhereYouWereMetres<=SAME_SPOT_METRES+accuracyMetres;
     }
+    /** Farther than this from the car, a beacon in it can't be heard, so Bluetooth needn't listen. */
+    static final double BEACON_RANGE_METRES=1000;
+    public static boolean beyondBeacon(double phoneToCarMetres,float accuracyMetres) {
+        return phoneToCarMetres-accuracyMetres>BEACON_RANGE_METRES;
+    }
     /** Before unlocking on arrival: BYD's position for the car must be within the start distance of you, plus 30 m of GPS error. */
     public static boolean carIsHere(double phoneToCarMetres,double fireMetres) { return phoneToCarMetres<=fireMetres+30; }
     /**

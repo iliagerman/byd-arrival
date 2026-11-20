@@ -192,7 +192,8 @@ final class AppRuntime {
         long at=p.getLong("proximityAt",0);
         String time=android.text.format.DateFormat.format("HH:mm:ss",at).toString();
         if(distance.startsWith("Abroad")) return distance+" · "+time;
-        if(System.currentTimeMillis()-at>10*60000L) return "No reading since "+time;
+        // Paused on a trusted Wi-Fi there are no readings on purpose; the time is when it paused.
+        if(!distance.startsWith("Paused") && System.currentTimeMillis()-at>10*60000L) return "No reading since "+time;
         return (p.getBoolean("proximityArmed",false)?"Armed":"Not armed")+" · "+distance+" · "+time;
     }
     static void status(Context c,String message) {
