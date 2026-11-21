@@ -46,6 +46,17 @@ public final class MonitorService extends Service {
     private Location atCarFix;
     /** When a beacon was last at its strength (wall clock), and when the last beacon departure check started (elapsed). */
     private long lastStrongAt, beaconCheckAt;
+    /**
+     * The beacon went and GPS once agreed you're away: its departure check is retried every minute until BYD answers,
+     * even if GPS later puts you near the car again (seen 21 Nov: the house is about 10 m from where the car parks).
+     */
+    private boolean beaconLeaving;
+    /** A reading 20 to 120 s older than the latest, to tell your speed from how far you moved. */
+    private Location speedAnchor;
+    /** A car position read from BYD as you approached (and when, elapsed): a start within 90 s of it needn't ask again. */
+    private double[] approachCar;
+    private long approachCarAt=-1, lastApproachRead=-10*60_000L, lastBeaconLog=-10_000;
+    private double lastMetres=Double.MAX_VALUE;
     /** GPS confirmed you walked away from the parked car, but left the walk-away to the beacon, which was still strong. */
     private boolean gpsSawYouLeave;
     /** When an arrival last fired (elapsed): a walk-away decided before it isn't sent, because you came back. */
@@ -75,7 +86,7 @@ public final class MonitorService extends Service {
     private final Runnable tick=new Runnable() {
         @Override public void run() {
             // While Bluetooth rests the beacon only seems gone, so it decides nothing then.
-            if(beaconScanning && beaconGate.absent(SystemClock.elapsedRealtime()-started) && awayFromCar()) beaconGone();
+            if(beaconScanning && beaconGate.absent(SystemClock.elapsedRealtime()-started) && (beaconLeaving || awayFromCar())) beaconGone();
             handler.postDelayed(this,1000);
         }
     };
@@ -223,14 +234,17 @@ public final class MonitorService extends Service {
         if(metres>AppRuntime.restartKm(this)*1000.0) { impossibleDistance(metres); return; }
         boolean rough=fix.getAccuracy()>rearmMetres, late=age>30000;
         // Faster than walking you're in a vehicle (or running), not walking up to the car, so it never starts then.
-        boolean moving=ProximityGate.movingFast(fix.hasSpeed(),fix.getSpeed(),fix.getAccuracy(),rearmMetres);
+        // In a car GPS is often too rough for its speed to count (seen 21 Nov: ±30 to ±130 m while driving), so how far
+        // you moved between readings counts too.
+        boolean reportedFast=ProximityGate.movingFast(fix.hasSpeed(),fix.getSpeed(),fix.getAccuracy(),rearmMetres);
+        boolean moving=reportedFast || movedFast(fix);
         if(moving) { lastFastAt=SystemClock.elapsedRealtime(); onTrip=true; }
         // A reading delivered more than 30 s late can't start or arm anything. It's shown with its own time, so it looks stale.
         ProximityGate.Event event=late?ProximityGate.Event.NONE
             :proximity.observe(metres,fix.getAccuracy(),cooldownPassed() && !onTrustedWifi() && !moving
                 && !verifying && SystemClock.elapsedRealtime()>=verifyRetryAt);
         AppRuntime.log(this,fix.getProvider()+" "+Math.round(metres)+" m ±"+Math.round(fix.getAccuracy())+" m, "+age/1000+" s old"
-            +(moving?", "+Math.round(fix.getSpeed()*3.6)+" km/h":"")+(event==ProximityGate.Event.NONE?"":", "+event));
+            +(reportedFast?", "+Math.round(fix.getSpeed()*3.6)+" km/h":moving?", moving (by position)":"")+(event==ProximityGate.Event.NONE?"":", "+event));
         // Following the car, the distance to its last checked spot means nothing: you're in it.
         String shown=withCar && !proximity.armed()?"With the car":Math.round(metres)+" m"+(rough?" ±"+Math.round(fix.getAccuracy()):"");
         showProximity(shown,System.currentTimeMillis()-age);
@@ -246,7 +260,40 @@ public final class MonitorService extends Service {
         else if(onTrip && !late && SystemClock.elapsedRealtime()-lastFastAt>2*60_000 && checkCar(reading,0,true,false)) {
             onTrip=false; unsureInRow=0;
         }
+        if(!late && !moving) readCarOnApproach(metres);
         if(event==ProximityGate.Event.FIRE) verifyThenArrive(Math.round(metres));
+    }
+    /** Fast by position: comparing with a reading 20 to 120 s older, after taking off both readings' error. */
+    private boolean movedFast(Location fix) {
+        Location from=speedAnchor;
+        long ms=from==null?Long.MAX_VALUE:(fix.getElapsedRealtimeNanos()-from.getElapsedRealtimeNanos())/1_000_000;
+        if(ms>120_000) { speedAnchor=fix; return false; }
+        if(ms<20_000) return false;
+        speedAnchor=fix;
+        return ProximityGate.movedFast(ProximityGate.metres(from.getLatitude(),from.getLongitude(),fix.getLatitude(),fix.getLongitude()),
+            from.getAccuracy(),fix.getAccuracy(),ms);
+    }
+    /**
+     * Walking up to the car (armed, crossing into 100 m of it, not on a trusted Wi-Fi), BYD is asked where the car is
+     * in advance, at most every 5 minutes. By the start distance the answer is in, so unlocking needn't wait for BYD
+     * (seen 21 Nov: 19 s at the car).
+     */
+    private void readCarOnApproach(double metres) {
+        boolean crossed=lastMetres>ProximityGate.APPROACH_METRES && metres<=ProximityGate.APPROACH_METRES;
+        lastMetres=metres;
+        long now=SystemClock.elapsedRealtime();
+        if(!crossed || !proximity.armed() || onTrustedWifi() || now-lastApproachRead<5*60_000L) return;
+        lastApproachRead=now;
+        AppRuntime.IO.execute(()-> {
+            try {
+                double[] car=AppRuntime.api(this).location(AppRuntime.prefs(this).getString("vin",""));
+                logCarPosition("approaching",car);
+                handler.post(()-> { approachCar=car; approachCarAt=SystemClock.elapsedRealtime(); });
+            } catch(Exception error) {
+                AppRuntime.clearSession();
+                AppRuntime.log(this,"approaching: couldn't read the car's position: "+AppRuntime.safeError(error));
+            }
+        });
     }
     /** An arrival is being confirmed with BYD, and when a failed confirmation may be tried again (elapsed time). */
     private boolean verifying;
@@ -256,6 +303,19 @@ public final class MonitorService extends Service {
      * is: only if it's really here do the unlock and start run. Otherwise its position is updated and the trigger stays armed.
      */
     private void verifyThenArrive(long metres) {
+        long now=SystemClock.elapsedRealtime();
+        // The beacon is in the car: heard at full strength in the last 20 s, the car is right here. A faint signal
+        // isn't enough: it could come from the car parked further off by someone else.
+        if(beaconGate!=null && beaconGate.strongSince(now-started-20_000)) {
+            AppRuntime.log(this,"car is here: its beacon was just heard at full strength, so BYD isn't asked");
+            arrivalChecked(new double[]{carLatitude,carLongitude,0},metres); return;
+        }
+        double[] read=approachCar;
+        approachCar=null; // used once: a "car not here" answer isn't repeated from it
+        if(read!=null && now-approachCarAt<=90_000) {
+            AppRuntime.log(this,"car is here? using BYD's position read as you approached, "+(now-approachCarAt)/1000+" s ago");
+            arrivalChecked(read,metres); return;
+        }
         verifying=true;
         AppRuntime.IO.execute(()-> {
             try {
@@ -385,6 +445,7 @@ public final class MonitorService extends Service {
                 carLatitude=car[0]; carLongitude=car[1]; AppRuntime.saveCar(this,carLatitude,carLongitude);
                 proximity.carChecked(true); withCar=true;
                 if(beaconGate!=null) { beaconGate.disarm(); saveBeaconArmed(); } // you're in the car: a dip in its signal mustn't start it mid-trip
+                beaconLeaving=false;
                 setWalkAwayPending(true);
                 AppRuntime.prefs(this).edit().putBoolean("gateArmed",false).commit();
                 AppRuntime.proximityEvent(this,"Car moved "+moved+" m with you: following it");
@@ -418,6 +479,7 @@ public final class MonitorService extends Service {
      * left to the distance.
      */
     private void beaconLeft(double[] car,long moved) {
+        beaconLeaving=false;
         if(beaconGate.strongSince(beaconCheckAt-started)) { AppRuntime.log(this,"beacon back at full strength: you're at the car"); return; }
         beaconGate.leftCar(); saveBeaconArmed();
         if(SystemClock.elapsedRealtime()-lastFastAt<60_000) {
@@ -550,6 +612,7 @@ public final class MonitorService extends Service {
         started=SystemClock.elapsedRealtime();
         int seconds=AppRuntime.beaconScanSeconds(this);
         beaconGate=new ArrivalGate(AutoStartSettings.beaconAbsentMillis(seconds));
+        beaconLeaving=false;
         // Armed before a restart (app update, phone restart), it stays armed: near the car the beacon is still heard,
         // so it couldn't re-arm until you walked well away (seen 20:32, "Not armed · 22 m" right after an update).
         if(AppRuntime.prefs(this).getBoolean("beaconArmed",false)) beaconGate.arm();
@@ -581,7 +644,9 @@ public final class MonitorService extends Service {
             AppRuntime.proximityEvent(this,"Armed by Bluetooth: the beacon is out of range");
             showProximity(lastDistance,lastDistanceAt);
         }
-        if(beaconGate.atCar() && checkCar("beacon out of range",60_000,false,true)) beaconCheckAt=SystemClock.elapsedRealtime();
+        if(!beaconGate.atCar()) return;
+        beaconLeaving=true;
+        if(checkCar("beacon out of range",60_000,false,true)) beaconCheckAt=SystemClock.elapsedRealtime();
     }
     /**
      * GPS agrees you're away from the car: a reading from the last minute, its whole accuracy margin beyond the start
@@ -601,7 +666,9 @@ public final class MonitorService extends Service {
      */
     private void beaconSeen(Beacons.Beacon beacon,int rssi) {
         if(beaconGate==null) return;
-        if(rssi>=beacon.threshold) atCar();
+        if(rssi>=beacon.threshold) { atCar(); beaconLeaving=false; }
+        long now=SystemClock.elapsedRealtime();
+        if(beaconGate.armed() && now-lastBeaconLog>=10_000) { lastBeaconLog=now; AppRuntime.log(this,"beacon "+beacon.label+" "+rssi+" dBm (armed)"); }
         boolean mayStart=cooldownPassed() && !onTrustedWifi() && !verifying && SystemClock.elapsedRealtime()-lastFastAt>=15000;
         if(!beaconGate.observe(SystemClock.elapsedRealtime()-started,rssi-beacon.threshold,mayStart)) return;
         saveBeaconArmed();

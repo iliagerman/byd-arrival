@@ -84,6 +84,15 @@ public final class ProximityGate {
     public static boolean beyondBeacon(double phoneToCarMetres,float accuracyMetres) {
         return phoneToCarMetres-accuracyMetres>BEACON_RANGE_METRES;
     }
+    /**
+     * From two readings at least 20 s apart: you certainly moved faster than walking, even counting both readings' error.
+     * Indoor GPS jumps stay within their error, so they can't pass; a drive with ±60 m readings does.
+     */
+    public static boolean movedFast(double metresBetween,float accuracyA,float accuracyB,long millis) {
+        return millis>=20_000 && (metresBetween-accuracyA-accuracyB)/(millis/1000.0)>3.5;
+    }
+    /** Crossing into this distance of the car, BYD is asked where it is, so unlocking at the start distance needn't wait. */
+    static final double APPROACH_METRES=100;
     /** Before unlocking on arrival: BYD's position for the car must be within the start distance of you, plus 30 m of GPS error. */
     public static boolean carIsHere(double phoneToCarMetres,double fireMetres) { return phoneToCarMetres<=fireMetres+30; }
     /**

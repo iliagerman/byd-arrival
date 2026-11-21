@@ -195,6 +195,9 @@ public class CoreTest {
         check(BydApi.tailgateClosed(new org.json.JSONObject().put("trunkLid", 0)), "tailgate reported closed: Close & lock skips closing it (BYD refuses with 6088)");
         check(!BydApi.tailgateClosed(new org.json.JSONObject().put("trunkLid", 1)) && !BydApi.tailgateClosed(new org.json.JSONObject().put("trunkLid", -1))
             && !BydApi.tailgateClosed(new org.json.JSONObject()), "tailgate open or unknown: Close & lock closes it");
+        check(ProximityGate.movedFast(396, 106, 88, 40_000), "driving with rough GPS (396 m in 40 s at ±106 and ±88 m) counts as in a vehicle");
+        check(!ProximityGate.movedFast(200, 235, 235, 20_000), "indoor GPS jumps within their error don't count as moving");
+        check(!ProximityGate.movedFast(60, 5, 5, 40_000) && !ProximityGate.movedFast(400, 5, 5, 10_000), "walking pace, or readings under 20 s apart, don't count");
         check(ProximityGate.beyondBeacon(1500, 20) && !ProximityGate.beyondBeacon(900, 5), "over 1 km from the car Bluetooth rests; within it, it listens");
         check(!ProximityGate.beyondBeacon(1100, 300), "a rough reading that could be within 1 km keeps Bluetooth listening");
         check(ProximityGate.leftWhereYouWere(40, 8) && ProximityGate.leftWhereYouWere(55, 10), "car still where you were with it, within GPS error: you walked away");
