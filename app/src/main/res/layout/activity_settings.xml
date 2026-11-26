@@ -128,6 +128,11 @@
             <Button android:id="@+id/check_updates" style="@style/ButtonTonal" android:text="@string/check_updates" />
             <Button android:id="@+id/save_log" style="@style/ButtonText" android:text="@string/save_log" />
             <Button android:id="@+id/share_log" style="@style/ButtonText" android:text="@string/share_log" />
+            <TextView style="@style/FieldLabel" android:text="@string/report_url" />
+            <EditText android:id="@+id/report_url" style="@style/Field" android:layout_marginTop="4dp" android:hint="https://…"
+                android:inputType="textUri" />
+            <TextView style="@style/Body" android:text="@string/report_url_hint" android:textSize="13sp" />
+            <Button android:id="@+id/send_report" style="@style/ButtonTonal" android:text="@string/report_title" />
             <Button android:id="@+id/forget" style="@style/ButtonText" android:text="@string/forget" android:textColor="@color/danger" />
         </LinearLayout>
 

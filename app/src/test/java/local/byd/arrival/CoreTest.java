@@ -202,6 +202,19 @@ public class CoreTest {
         check(!ProximityGate.beyondBeacon(1100, 300), "a rough reading that could be within 1 km keeps Bluetooth listening");
         check(ProximityGate.leftWhereYouWere(40, 8) && ProximityGate.leftWhereYouWere(55, 10), "car still where you were with it, within GPS error: you walked away");
         check(!ProximityGate.leftWhereYouWere(300, 10), "car 300 m from where you parted: someone drove it off, nothing is sent");
+        check(Report.validUrl("https://hooks.example.com/abc?token=1") && !Report.validUrl("http://hooks.example.com/abc")
+            && !Report.validUrl("hooks.example.com") && !Report.validUrl("https://") && !Report.validUrl(""), "a report webhook must be https with a host");
+        Map<String, Object> prefsSaved = new HashMap<>();
+        prefsSaved.put("account", "someone@example.com"); prefsSaved.put("carLatitude", "32.1"); prefsSaved.put("carLongitude", "34.8");
+        prefsSaved.put("vin", "LGXCE4CB1R0005163"); prefsSaved.put("fireMetres", 15); prefsSaved.put("trustedWifi", new HashSet<>(List.of("fox-mesh")));
+        prefsSaved.put("reportUrl", "https://hooks.example.com/secret");
+        org.json.JSONObject reportSettings = Report.settings(prefsSaved);
+        check(!reportSettings.has("account") && !reportSettings.has("carLatitude") && !reportSettings.has("carLongitude") && !reportSettings.has("reportUrl"), "a report leaves out the email, the car's coordinates and the webhook address");
+        check(reportSettings.getString("vin").equals("···5163") && reportSettings.getInt("fireMetres") == 15 && reportSettings.getJSONArray("trustedWifi").getString(0).equals("fox-mesh"), "a report keeps settings, with only the VIN's last 4");
+        org.json.JSONObject report = Report.build("  It showed 151 km next to the car ", "2026-11-26T17:28:03+02:00", new org.json.JSONObject().put("appVersion", "62"),
+            new org.json.JSONObject(), reportSettings, "11-26 17:27 gps 151378 m\n11-26 17:28 gps 151378 m");
+        check(report.getString("description").equals("It showed 151 km next to the car") && report.getString("sentAt").startsWith("2026-11-26T17:28")
+            && report.getInt("logLines") == 2 && report.getString("kind").equals("byd-arrival-report"), "a report carries the description, the time and the log");
         List<History.Entry> recent = new ArrayList<>();
         for (int i = 0; i < 45; i++) recent = History.add(recent, new History.Entry(i, "Widget", "Lock", History.OK, "Confirmed by BYD."));
         check(recent.size() == History.MAX && recent.get(0).at == 44, "recent actions keep the newest 40, newest first");

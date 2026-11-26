@@ -209,6 +209,27 @@ How it behaves:
 - When the beacon goes out of range after you were at the car, BYD is asked where the car is. If BYD doesn't answer, it asks again every minute until it does, even when GPS then puts you near the car again (a house a few metres from where the car parks), unless the beacon comes back. That position becomes the car's spot, and the walk-away action may run (see the auto-start rules above). If you come back to the car while BYD is being asked, nothing is sent.
 - The log notes how often it listens and each beacon's strength whenever monitoring starts.
 - Signal strength is only a rough guide to distance, and Bluetooth signals can be spoofed.
+## Report a problem
+
+Send a problem report from anywhere, without connecting the phone to a computer:
+
+1. Settings → **Report webhook address**: an https address that accepts JSON posts, for example an automation webhook. Plain http is refused, because the log travels in the report.
+2. When something goes wrong, tap **Report a problem** at the bottom of the home screen (or in Settings), say what happened, and tap **Send**.
+
+The report is one JSON post:
+
+| Field | What it holds |
+|---|---|
+| `kind` | Always `byd-arrival-report` |
+| `description` | What you wrote |
+| `sentAt` | The phone's time with its offset, for example `2026-11-26T17:28:03+02:00` |
+| `device` | App version, phone, Android version, time zone, permissions, battery restrictions and battery saver, whether location and Bluetooth are on |
+| `now` | The status line, the widget's armed state and distance, the last event, whether monitoring is on and whether an action is running |
+| `settings` | All the app's settings, including Recent actions, beacons, trusted Wi-Fi and Start car levels |
+| `logLines`, `log` | The last 20,000 log lines, about a day: readings, events, car checks and results |
+
+It never contains your password or PIN (they're stored apart, encrypted), your sign-in email, the car's coordinates, the webhook address itself, or more than the VIN's last 4 characters. A report that couldn't be sent says why; whether it was sent is also noted in the log.
+
 ## Updates
 
 The app looks for new versions at launch, about every 12 hours in the background, and when you tap Settings → **Check for updates**.

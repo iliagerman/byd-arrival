@@ -32,6 +32,7 @@ public final class MainActivity extends Activity implements SharedPreferences.On
         proxIcon=findViewById(R.id.prox_icon); proxText=findViewById(R.id.prox_text);
         findViewById(R.id.settings).setOnClickListener(v->openSettings());
         findViewById(R.id.setup_button).setOnClickListener(v->firstRunChecks());
+        findViewById(R.id.report).setOnClickListener(v->ReportDialog.show(this));
         start=findViewById(R.id.start);
         start.setOnClickListener(v->send("START"));
         grid=findViewById(R.id.grid);

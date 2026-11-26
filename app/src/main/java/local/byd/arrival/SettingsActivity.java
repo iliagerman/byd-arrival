@@ -33,6 +33,7 @@ public final class SettingsActivity extends Activity {
         showWifi();
         bindAbroad();
         ((EditText)findViewById(R.id.wifi_signal)).setText(String.valueOf(AppRuntime.wifiSignal(this)));
+        ((EditText)findViewById(R.id.report_url)).setText(AppRuntime.prefs(this).getString("reportUrl",""));
         new StartSettings(this);
         new ActionSettings(this);
         beacons=new BeaconSettings(this,this::restartIfMonitoring);
@@ -49,11 +50,12 @@ public final class SettingsActivity extends Activity {
         click(R.id.check_updates,()->Updates.checkNow(this));
         click(R.id.share_log,this::shareLog);
         click(R.id.save_log,this::saveLog);
+        click(R.id.send_report,()-> { if(saveReportUrl()) ReportDialog.show(this); });
         ((TextView)findViewById(R.id.app_version)).setText(getString(R.string.app_version,BuildConfig.VERSION_NAME));
     }
     @Override protected void onResume() { super.onResume(); refresh(); }
     /** The Wi-Fi signal is read live by the monitor, so saving it on leaving takes effect without a restart. */
-    @Override protected void onPause() { beacons.stop(); saveWifiSignal(); saveRestartKm(); super.onPause(); }
+    @Override protected void onPause() { beacons.stop(); saveWifiSignal(); saveRestartKm(); saveReportUrl(); super.onPause(); }
 
     private void refresh() {
         SharedPreferences prefs=AppRuntime.prefs(this);
@@ -150,6 +152,14 @@ public final class SettingsActivity extends Activity {
         toast("Added "+name+". Signal here: "+signal+" dBm.");
     }
     /** Anything entered becomes a working value, and the field shows the result. */
+    /** Saves the report webhook address when it's https (or blank, to clear it). False, with a message, when it isn't. */
+    private boolean saveReportUrl() {
+        String url=((EditText)findViewById(R.id.report_url)).getText().toString().trim();
+        if(url.isEmpty()) { AppRuntime.prefs(this).edit().remove("reportUrl").apply(); return true; }
+        if(!Report.validUrl(url)) { toast("The report address must start with https://"); return false; }
+        AppRuntime.prefs(this).edit().putString("reportUrl",url).apply();
+        return true;
+    }
     private void saveWifiSignal() {
         EditText field=findViewById(R.id.wifi_signal);
         int signal=AutoStartSettings.wifiSignal(field.getText().toString());

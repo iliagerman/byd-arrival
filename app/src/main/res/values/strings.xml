@@ -49,6 +49,12 @@
     <string name="temperature_label">A/C temperature</string>
     <string name="engine_minutes">Engine-on time</string>
     <string name="history_title">Recent actions</string>
+    <string name="report_title">Report a problem</string>
+    <string name="report_body">Sends what you write, with the app\'s state and about the last day of its log, to your report webhook. Never your password, PIN, email or locations.</string>
+    <string name="report_hint">What happened? For example: I was next to the car and it showed 151 km.</string>
+    <string name="report_no_url">Add the report webhook address in Settings first.</string>
+    <string name="report_url">Report webhook address</string>
+    <string name="report_url_hint">Report a problem sends reports here as JSON: your description, the time, the phone and app state, settings and about the last day of the log. It must start with https://.</string>
     <string name="history_none">Nothing yet. Each action shows here with what triggered it: the app, the widget, Bluetooth, the distance or walking away.</string>
     <string name="level_driver">Driver seat heat</string>
     <string name="level_passenger">Passenger seat heat</string>

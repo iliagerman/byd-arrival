@@ -68,5 +68,6 @@
             <LinearLayout android:id="@+id/history_list" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:orientation="vertical" />
         </LinearLayout>
+        <Button android:id="@+id/report" style="@style/ButtonText" android:layout_marginBottom="16dp" android:text="@string/report_title" />
     </LinearLayout>
 </ScrollView>
