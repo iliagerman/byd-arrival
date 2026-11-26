@@ -298,6 +298,8 @@ public final class MonitorService extends Service {
     /** An arrival is being confirmed with BYD, and when a failed confirmation may be tried again (elapsed time). */
     private boolean verifying;
     private long verifyRetryAt;
+    /** The running confirmation, so a beacon arrival can cancel it. */
+    private java.util.concurrent.Future<?> verification;
     /**
      * Someone else may have the car, so its saved spot can be out of date. Before unlocking, BYD is asked where the car
      * is: only if it's really here do the unlock and start run. Otherwise its position is updated and the trigger stays armed.
@@ -317,16 +319,17 @@ public final class MonitorService extends Service {
             arrivalChecked(read,metres); return;
         }
         verifying=true;
-        AppRuntime.IO.execute(()-> {
+        // A beacon arrival meanwhile (see beaconSeen) drops this check: its answer then changes nothing.
+        verification=AppRuntime.IO.submit(()-> {
             try {
                 double[] car=AppRuntime.api(this).location(AppRuntime.prefs(this).getString("vin",""));
                 logCarPosition("before unlocking",car);
-                handler.post(()->arrivalChecked(car,metres));
+                handler.post(()-> { if(lastArrivalAt<=now) arrivalChecked(car,metres); });
             } catch(Exception error) {
                 AppRuntime.clearSession();
                 handler.post(()-> {
                     verifying=false; verifyRetryAt=SystemClock.elapsedRealtime()+30_000;
-                    if(stopped) return;
+                    if(stopped || lastArrivalAt>now) return;
                     proximity.arm();
                     AppRuntime.note(this,"Couldn't confirm the car is here: "+AppRuntime.safeError(error)+" Not unlocking; trying again in 30 seconds.");
                 });
@@ -669,9 +672,16 @@ public final class MonitorService extends Service {
         if(rssi>=beacon.threshold) { atCar(); beaconLeaving=false; }
         long now=SystemClock.elapsedRealtime();
         if(beaconGate.armed() && now-lastBeaconLog>=10_000) { lastBeaconLog=now; AppRuntime.log(this,"beacon "+beacon.label+" "+rssi+" dBm (armed)"); }
-        boolean mayStart=cooldownPassed() && !onTrustedWifi() && !verifying && SystemClock.elapsedRealtime()-lastFastAt>=15000;
+        // Not held back while BYD confirms a GPS arrival: when the car is asleep that takes up to a minute (seen 26 Nov:
+        // at the car, beacon at full strength, nothing for 38 s, then the unlock hit a car busy with those requests).
+        boolean mayStart=cooldownPassed() && !onTrustedWifi() && SystemClock.elapsedRealtime()-lastFastAt>=15000;
         if(!beaconGate.observe(SystemClock.elapsedRealtime()-started,rssi-beacon.threshold,mayStart)) return;
         saveBeaconArmed();
+        if(verifying) {
+            // Stops its waits between BYD requests, so the unlock doesn't queue behind them; its answer is ignored.
+            verification.cancel(true); verifying=false;
+            AppRuntime.log(this,"beacon at full strength: not waiting for BYD to confirm the car is here");
+        }
         proximity.startedByBeacon();
         AppRuntime.prefs(this).edit().putLong("lastAutoStartAt",System.currentTimeMillis()).putBoolean("gateArmed",false).commit();
         setWalkAwayPending(true);

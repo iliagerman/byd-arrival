@@ -189,7 +189,7 @@ Android doesn't report every small signal change, and may report fewer while the
 
 ### Bluetooth beacons in the car
 
-A small beacon kept in the car is the first trigger: auto-start fires when a beacon's signal reaches its strength **or** when you're within the start distance, whichever comes first, and the other then counts as having fired too. Because the beacon is in the car, a strong signal proves the car is there, so unlike the start distance, BYD isn't asked first, which makes it quicker. Trusted Wi-Fi, the minimum time between starts and "never while driving" apply to it too.
+A small beacon kept in the car is the first trigger: auto-start fires when a beacon's signal reaches its strength **or** when you're within the start distance, whichever comes first, and the other then counts as having fired too. Because the beacon is in the car, a strong signal proves the car is there, so unlike the start distance, BYD isn't asked first, which makes it quicker. If the start distance is still waiting for BYD to confirm the car is there (up to a minute while the car wakes), a strong beacon signal doesn't wait: that check is dropped and the car unlocks at once. Trusted Wi-Fi, the minimum time between starts and "never while driving" apply to it too.
 
 Under Settings → **Bluetooth beacons in the car**:
 
