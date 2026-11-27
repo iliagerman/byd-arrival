@@ -257,7 +257,8 @@ public final class MonitorService extends Service {
         else if(moving && !late) checkCar(reading,ProximityGate.vehicleCheckGapMs(unsureInRow),false,false);
         // Two minutes without fast readings ends the trip: one car check follows the car to where it was parked, even
         // if checks during the drive failed (seen: BYD busy, 1008), and the next trip starts with checks every minute.
-        else if(onTrip && !late && SystemClock.elapsedRealtime()-lastFastAt>2*60_000 && checkCar(reading,0,true,false)) {
+        // A failed one is tried again a minute later, not at the next reading (seen 26 Nov 13:24: four tries in 8 s).
+        else if(onTrip && !late && SystemClock.elapsedRealtime()-lastFastAt>2*60_000 && checkCar(reading,60_000,true,false)) {
             onTrip=false; unsureInRow=0;
         }
         if(!late && !moving) readCarOnApproach(metres);
